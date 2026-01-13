@@ -42,7 +42,7 @@ library(stringr)
 library(dplyr)
 
 id <- 99
-date <- "20260112"
+date <- "20260113"
 
 root <- paste0("I:\\biocon\\ebv_portal\\", id)
 js   <- file.path(root, "metadata.json")
@@ -53,7 +53,8 @@ tif_root  <- file.path("S:\\ebv_portal", id, "data")
 tif_files <- list.files(tif_root, pattern="\\.tif$", recursive=TRUE, full.names=TRUE)
 stopifnot(length(tif_files) > 0)
 
-cat("Path: ", tif_files)
+cat(paste0("Path: ", tif_files, "\n"), "\n")
+
 ```
 
 ---
@@ -64,7 +65,13 @@ data correctly into the netCDF.
 
 ```{r scenarios-years}
 p_norm <- gsub("\\\\", "/", tif_files)
-scs    <- basename(dirname(p_norm))
+scs <- basename(dirname(p_norm))
+scs <- gsub("_.*", "", scs)
+scenario_levels <- c("NfN", "NfNl", "NaC", "NfS", "BAU")
+
+# Match scenarios found in the data with the expected ones
+stopifnot(setequal(scenario_levels, unique(scs)))
+
 
 band_years_available <- c(2021, 2030, 2050, 2070, 2100)
 timesteps_int <- band_years_available
@@ -72,11 +79,12 @@ timesteps     <- as.character(timesteps_int)
 
 band_idx <- match(timesteps_int, band_years_available)
 stopifnot(!any(is.na(band_idx)))
+cat("Scenarios:", paste(scenario_levels, collapse=", "), "\n")
+cat("Years:", paste(timesteps, collapse=", "), "\n")
 
 ```
 
 ---
-
 ## Template and classes/entitites
 Read the first GeoTIFF to extract spatial properties and land cover classes.
 We define class_id and class_names, and not neded classes (ocean, no data) will 
@@ -162,8 +170,8 @@ cat("EBV cube created at:", nc, "\n")
 ---
 
 ## Insert data into the netCDF (precense/absence)
-Create an temporary folder in locla disk to optimized and write temporary files.
-
+Create an temporary folder in locla disk to optimized time and write temporary files.
+The inserction data to the file, should be by order - loop th
 
 ```{r write-data}
 local_tmp <- "C:/temp/ebvcube_tmp"
@@ -176,7 +184,7 @@ terraOptions(
 )
 
 # loop through each scenario
-for (s_no in seq_along(scs)) {
+for (s_no in seq_along(scenario_levels)) {
 
   sc <- scenario_levels[s_no]
   idx_sc <- which(scs == sc)
@@ -202,6 +210,8 @@ for (s_no in seq_along(scs)) {
 
       code <- class_id[e_no]
       
+      cat("Entity:", entities[e_no], " (code ", code, ")\n")
+      
       # Convert to binary to store it as one byte per pixel
       bin_r <- ifel(is.na(r_t), NA, ifel(r_t == code, 1, 0))
       
@@ -214,7 +224,7 @@ for (s_no in seq_along(scs)) {
         overwrite = TRUE,
         datatype  = "INT1S", # signed byte
         NAflag    = -1,          
-        wopt      = list(gdal = c("COMPRESS=DEFLATE", "ZLEVEL=1")))
+        wopt      = list(gdal = c("COMPRESS=DEFLATE")))
 
       # Add data to the nc file, using one byte per pixel
       ebv_add_data(
@@ -229,9 +239,8 @@ for (s_no in seq_along(scs)) {
         raw         = TRUE,
         verbose     = FALSE
       )
-
+  
       # Remove the temporary file and raster variable to free up local disk space.
-      unlink(tmp_tif)
       rm(bin_r)
     }
     
