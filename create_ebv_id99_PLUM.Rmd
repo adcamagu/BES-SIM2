@@ -1,15 +1,14 @@
 ---
-title: "PLUM (ID 99) — EBV Cube: Presence/Absence by class"
+title: 'PLUM (ID 99) — EBV Cube: Presence/Absence as byte binary'
 output:
-  html_notebook: default
+  html_document: default
 ---
 
 ```{r }
 knitr::opts_chunk$set(
   echo = TRUE,
   message = TRUE,
-  warning = TRUE
-)
+  warning = TRUE)
 ```
 
 ## Objective 
@@ -168,10 +167,9 @@ cat("EBV cube created at:", nc, "\n")
 ```
 
 ---
-
 ## Insert data into the netCDF (precense/absence)
 Create an temporary folder in locla disk to optimized time and write temporary files.
-The inserction data to the file, should be by order - loop th
+The inserction data to the file, should be by order - loop through scenarios, timesteps, entities.
 
 ```{r write-data}
 local_tmp <- "C:/temp/ebvcube_tmp"
@@ -183,9 +181,10 @@ terraOptions(
   progress = 1
 )
 
+
 # loop through each scenario
 for (s_no in seq_along(scenario_levels)) {
-
+  
   sc <- scenario_levels[s_no]
   idx_sc <- which(scs == sc)
 
@@ -207,7 +206,7 @@ for (s_no in seq_along(scenario_levels)) {
     
     # Loop through each entity
     for (e_no in seq_along(class_id)) {
-
+      
       code <- class_id[e_no]
       
       cat("Entity:", entities[e_no], " (code ", code, ")\n")
@@ -240,7 +239,7 @@ for (s_no in seq_along(scenario_levels)) {
         verbose     = FALSE
       )
   
-      # Remove the temporary file and raster variable to free up local disk space.
+      # Remove the temporary file
       rm(bin_r)
     }
     
@@ -257,8 +256,15 @@ for (s_no in seq_along(scenario_levels)) {
 ## Quick vallidation and visualization
 
 ```{r validate}
-ebv_analyse(nc)
-props <- ebv_properties(nc)
-props$general$timesteps
-head(props$general$entity_names)
+ebv_analyse(nc, entity=1, timestep=1, scenario=1, metric=1)
+props <- ebv_properties(nc, scenario=1, metric=1)
+props@ebv_cube$type
+# H5T_STD_I8LE 	8-bit little-endian signed integer (2's complement)
+props@general$entity_names
+
+datacubes <- ebv_datacubepaths(nc, verbose=FALSE)
+
+ebv_map(filepath = nc, datacubepath = datacubes[1,1], entity = 1,
+        timestep = 1, classes = 2, verbose = FALSE)
+
 ```
