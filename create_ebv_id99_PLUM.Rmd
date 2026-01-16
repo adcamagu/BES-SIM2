@@ -1,9 +1,24 @@
 ---
 title: 'PLUM (ID 99) — EBV Cube: Presence/Absence as byte binary'
+<<<<<<< HEAD
 output: html_document
 ---
 
 ## Overview
+=======
+output:
+  html_document: default
+---
+
+```{r }
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = TRUE,
+  warning = TRUE)
+```
+
+## Objective 
+>>>>>>> fcecd523726a6e9f9eb560227f4470acd1e7078b
 
 this notebook creates an **EBV Cube** (netCDF) for the **PLUM (ID 99)** dataset from multiband GeoTIFFs, where:
 
@@ -152,6 +167,10 @@ cat("EBV cube created at:", nc, "\n")
 
 ```
 
+<<<<<<< HEAD
+=======
+---
+>>>>>>> fcecd523726a6e9f9eb560227f4470acd1e7078b
 ## Insert data into the netCDF (precense/absence)
 Create an temporary folder in locla disk to optimized time and write temporary files.
 The inserction data to the file, should be by order - loop through scenarios, timesteps, entities.
@@ -238,7 +257,11 @@ for (s_no in seq_along(scenario_levels)) {
 
 ## Quick vallidation and visualization
 
+<<<<<<< HEAD
 ```{r, eval=FALSE}
+=======
+```{r validate}
+>>>>>>> fcecd523726a6e9f9eb560227f4470acd1e7078b
 ebv_analyse(nc, entity=1, timestep=1, scenario=1, metric=1)
 props <- ebv_properties(nc, scenario=1, metric=1)
 props@ebv_cube$type
