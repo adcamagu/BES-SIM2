@@ -1,18 +1,9 @@
 ---
-title: "PLUM (ID 99) — EBV Cube: Presence/Absence by class"
-output:
-  html_notebook: default
+title: 'PLUM (ID 99) — EBV Cube: Presence/Absence as byte binary'
+output: html_document
 ---
 
-```{r }
-knitr::opts_chunk$set(
-  echo = TRUE,
-  message = TRUE,
-  warning = TRUE
-)
-```
-
-## Objective 
+## Overview
 
 this notebook creates an **EBV Cube** (netCDF) for the **PLUM (ID 99)** dataset from multiband GeoTIFFs, where:
 
@@ -26,13 +17,11 @@ this notebook creates an **EBV Cube** (netCDF) for the **PLUM (ID 99)** dataset 
 
 **Note:** In netCDF/CF, the binary is represented as a byte (0/1).
 
----
-
 ## Load libraries and define paths
 Load the necessary libraries and define the paths. The JSON file with the metadata should have been created beforehand. Name the file according to the naming convention. Save the output file
 in the S: drive. 
 
-```{r libs-paths}
+```{r}
 rm(list = ls())
 gc()
 
@@ -57,13 +46,12 @@ cat(paste0("Path: ", tif_files, "\n"), "\n")
 
 ```
 
----
 
 ## Scenarios and years 
 Define scenarios and years available in the data.This will be used to map the 
 data correctly into the netCDF. 
 
-```{r scenarios-years}
+```{r}
 p_norm <- gsub("\\\\", "/", tif_files)
 scs <- basename(dirname(p_norm))
 scs <- gsub("_.*", "", scs)
@@ -84,14 +72,13 @@ cat("Years:", paste(timesteps, collapse=", "), "\n")
 
 ```
 
----
 ## Template and classes/entitites
 Read the first GeoTIFF to extract spatial properties and land cover classes.
 We define class_id and class_names, and not neded classes (ocean, no data) will 
 be removed in the next step.
 
 
-```{r template-classes}
+```{r}
 r0 <- rast(tif_files[1])
 
 extent <- as.vector(ext(r0))
@@ -109,6 +96,7 @@ entities_full <- class_names
 length(class_id)
 cat( paste0(class_id, ": ", class_names, collapse="\n"), "\n")
 ```
+
 ## Remove and define the final entities 
 Delete entities that are not necessary. In this case, the following should be removed:
 - 0: Ocean
@@ -135,15 +123,12 @@ entities <- class_names
 cat( paste0(class_id, ": ", class_names, collapse="\n"), "\n")
 ```
 
-
----
-
 ## Create an empty EBV netCDF file
 The fill values and the precision (data type) for the NetCDF file should be defined.
 In this case, use bytes, as this is the most efficient way to save real binary cubes. 
 One byte is used per pixel, as opposed to double, which uses eight bytes per pixel, or integer, which uses four bytes.
 
-```{r ebv-create}
+```{r}
 fillvalue <- -1
 prec <- "byte"
 metric_no <- 1
@@ -167,13 +152,11 @@ cat("EBV cube created at:", nc, "\n")
 
 ```
 
----
-
 ## Insert data into the netCDF (precense/absence)
 Create an temporary folder in locla disk to optimized time and write temporary files.
-The inserction data to the file, should be by order - loop th
+The inserction data to the file, should be by order - loop through scenarios, timesteps, entities.
 
-```{r write-data}
+```{r, eval=FALSE}
 local_tmp <- "C:/temp/ebvcube_tmp"
 dir.create(local_tmp, showWarnings = FALSE, recursive = TRUE)
 
@@ -183,9 +166,10 @@ terraOptions(
   progress = 1
 )
 
+
 # loop through each scenario
 for (s_no in seq_along(scenario_levels)) {
-
+  
   sc <- scenario_levels[s_no]
   idx_sc <- which(scs == sc)
 
@@ -207,7 +191,7 @@ for (s_no in seq_along(scenario_levels)) {
     
     # Loop through each entity
     for (e_no in seq_along(class_id)) {
-
+      
       code <- class_id[e_no]
       
       cat("Entity:", entities[e_no], " (code ", code, ")\n")
@@ -240,7 +224,7 @@ for (s_no in seq_along(scenario_levels)) {
         verbose     = FALSE
       )
   
-      # Remove the temporary file and raster variable to free up local disk space.
+      # Remove the temporary file
       rm(bin_r)
     }
     
@@ -252,13 +236,18 @@ for (s_no in seq_along(scenario_levels)) {
 
 ```
 
----
-
 ## Quick vallidation and visualization
 
-```{r validate}
-ebv_analyse(nc)
-props <- ebv_properties(nc)
-props$general$timesteps
-head(props$general$entity_names)
+```{r, eval=FALSE}
+ebv_analyse(nc, entity=1, timestep=1, scenario=1, metric=1)
+props <- ebv_properties(nc, scenario=1, metric=1)
+props@ebv_cube$type
+# H5T_STD_I8LE 	8-bit little-endian signed integer (2's complement)
+props@general$entity_names
+
+datacubes <- ebv_datacubepaths(nc, verbose=FALSE)
+
+ebv_map(filepath = nc, datacubepath = datacubes[1,1], entity = 1,
+        timestep = 1, classes = 2, verbose = FALSE)
+
 ```

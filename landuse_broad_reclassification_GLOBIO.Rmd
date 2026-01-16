@@ -1,0 +1,261 @@
+---
+title: "GLOBIO Land-Use Reclassification to Broad Classes"
+output: html_notebook
+---
+## Overview
+This notebook takes **GLOBIO land-use GeoTIFF rasters in in zip files** and reclassifies their original land-use codes into a smaller set of **broad land-use classes**.
+
+
+## Clean environment and load libraries
+```{r}
+rm(list = ls())
+gc()
+
+library(terra)
+library(tidyverse)
+```
+
+## Define Terra options and temporary directories
+Make sure to set up a local temporary directory for processing large raster files. It should
+have enough space to handle the unzipped and intermediate raster files.
+
+```{r}
+local_temp <- "C:/temp/globio_reclass"
+dir.create(local_temp, showWarnings = FALSE, recursive = TRUE)
+
+terraOptions(
+  todisk = TRUE,
+  tempdir = local_temp,
+  progress = 1
+)
+  
+input_dat <- "S:\\Emmanuel_OcegueraConchas\\BES-SIM 2\\GLOBIO\\zip_original\\zip_original"
+output <- "S:\\Emmanuel_OcegueraConchas\\BES-SIM 2\\GLOBIO\\aggregated_broadclasses"
+dir.create(output, showWarnings = FALSE, recursive = TRUE)
+```
+
+
+## List all the zip files
+```{r}
+zip_files <- list.files(
+  input_dat,
+  pattern = "\\.zip$",
+  full.names = TRUE,
+  recursive = TRUE
+)
+
+length(zip_files)
+cat(paste0(zip_files, collapse = "\n"), "\n" )
+
+```
+
+## Build raster metadata table
+create a table (`tif_tbl`) that contains metadata for each raster file,
+including the scenario, SSP, parameter, and year. This table will help us manage
+the reclassification process by providing a structured overview of the rasters to be processed.
+```{r}
+tif_tbl <- tibble(
+  path = tif,
+  file = basename(tif)
+) %>%
+  mutate(
+    scenario = case_when(
+      str_detect(path, "NaC") ~ "NaC",
+      str_detect(path, "NfN") ~ "NfN",
+      str_detect(path, "NfS") ~ "NfS",
+      TRUE ~ NA_character_
+    ),
+    ssp   = str_extract(path, "ssp\\d+"),
+    param = str_remove_all(str_extract(path, "_\\d{2}_"), "_"),
+    year  = as.integer(str_extract(file, "\\d{4}"))
+  )
+cat("Table of rasters to process:\n")
+count(tif_tbl, scenario, ssp, param, year)
+```
+
+---
+
+## Broad land-use reclassification table
+Define reclassification table (`broad_lut`) that maps the original GLOBIO land-use codes
+to broader land-use categories. This table will be used to reclassify the raster values.
+This table has been provided by GLOBIO team.
+
+```{r}
+broad_lut <- tribble(
+  ~value, ~broad_id, ~broad_name,
+  1, 1, "Urban",
+  2, 1, "Urban",
+  190, 1, "Urban",
+
+  10, 10, "Cropland",
+  11, 10, "Cropland",
+  12, 10, "Cropland",
+
+  13, 13, "Potential secondary vegetation",
+  14, 13, "Potential secondary vegetation",
+
+  15, 15, "Agroforestry",
+
+  21, 21, "Pasture",
+
+  22, 22, "Rangeland",
+  
+  30, 30, "Forestry",
+
+  40, 40, "Secondary vegetation",
+
+  50, 50, "Unmanaged forest",
+  60, 50, "Unmanaged forest",
+  61, 50, "Unmanaged forest",
+  62, 50, "Unmanaged forest",
+  70, 50, "Unmanaged forest",
+  71, 50, "Unmanaged forest",
+  72, 50, "Unmanaged forest",
+  80, 50, "Unmanaged forest",
+  81, 50, "Unmanaged forest",
+  82, 50, "Unmanaged forest",
+  90, 50, "Unmanaged forest",
+  100, 50, "Unmanaged forest",
+  110, 50, "Unmanaged forest",
+
+  160, 50, "Unmanaged forest",
+  170, 50, "Unmanaged forest",
+  180, 50, "Unmanaged forest",
+
+  120, 120, "Shrubland/Grassland",
+  121, 120, "Shrubland/Grassland",
+  122, 120, "Shrubland/Grassland",
+  130, 120, "Shrubland/Grassland",
+  150, 150, "Shrubland/Grassland",
+  151, 150, "Shrubland/Grassland",
+  152, 150, "Shrubland/Grassland",
+  153, 150, "Shrubland/Grassland",
+ 
+
+  140, 140, "other",
+
+  200, 200, "Bare_areas",
+  201, 200, "Bare_areas",
+  202, 200, "Bare_areas",
+
+  210, 210, "Water_bodies",
+
+  220, 220, "Permanent_snow_ice"
+)
+# Count the totla number of the unique original land-use values
+cat("Number of unique original land-use values:", n_distinct(broad_lut$value), "\n")
+cat("Broad land-use reclassification table:\n")
+broad_lut
+```
+
+
+## Reclassification matrix
+Build up the reclassification matrix (`rcl`) from the `broad_lut` table.
+
+```{r}
+rcl <- as.matrix(broad_lut[, c("value", "broad_id")])
+```
+
+## List all the GeoTIFF files inside the zip files and reclassify them
+Process each zip file, extract the GeoTIFF files, and reclassify them using the
+broad land-use classes defined in the reclassification matrix.
+
+```{r}
+for (z in zip_files) {
+
+  # Make a unique temp folder for this zip
+  z_base <- tools::file_path_sans_ext(basename(z))
+  z_tmp  <- file.path(local_temp, paste0(z_base, "_", Sys.getpid()))
+  dir.create(z_tmp, showWarnings = FALSE, recursive = TRUE)
+
+  # Process only the z_base with 1.9 in the name
+  if (!grepl("1.9", z_base)) {
+    cat("Skipping ZIP (not _19_):", z, "\n")
+    next
+  }
+
+  cat("\n=== Unzipping ZIP to local temp ===\n", z_tmp, "\n")
+
+  # Unzip to local temp
+  unzip(z, exdir = z_tmp)
+
+  # List all tifs inside extracted contents
+  tif <- list.files(
+    z_tmp,
+    pattern = "\\.tif$",
+    full.names = TRUE,
+    recursive = TRUE
+  )
+
+  # Process each tif file
+  for (p in tif) {
+    cat("Processing file:", p, "\n")
+    p_norm <- gsub("\\\\", "/", p)
+
+    scenario <- if (grepl("NaC", p_norm)) "NaC" else if (grepl("NfN", p_norm)) "NfN" else if (grepl("NfS", p_norm)) "NfS" else NA
+
+    year <- as.integer(str_extract(basename(p_norm), "\\d{4}"))
+    # ssp  <- str_extract(p_norm, "ssp\\d+")
+
+    if (is.na(scenario) || is.na(year)) {
+      warning("Skipping: ", p)
+      next
+    }
+
+    cat("Reclassifying:", scenario, year, "\n")
+
+    r  <- rast(p)
+    r2 <- classify(r, rcl, others = NA)
+
+    out_dir <- file.path(output, paste0(scenario, "_19"))
+    dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+    out_file <- paste0(
+      "Globio4_landuse_10sec_",
+      year,
+      "_World_crop_int_withPattern_broad.tif"
+    )
+
+    writeRaster(
+      r2,
+      file.path(out_dir, out_file),
+      datatype = "INT1U",
+      NAflag = 255,
+      overwrite = TRUE,
+      wopt = list(gdal = c("COMPRESS=DEFLATE"))
+    )
+  }
+  # Clean up temp folder
+  unlink(z_tmp)
+}
+
+```
+
+## Reclassify historical 2020 raster separatelly 
+```{r}
+in_dir <- "S:\\Emmanuel_OcegueraConchas\\BES-SIM 2\\GLOBIO\\zip_original\\zip_original\\Historical_2000-2020.zip"
+out_dir_hist <- "S:\\Emmanuel_OcegueraConchas\\BES-SIM 2\\GLOBIO\\aggregated_broadclasses\\Historical_2020"
+dir.create(out_dir_hist, showWarnings = FALSE, recursive = TRUE)
+
+# Create a temp folder for unzipping
+z_base <- tools::file_path_sans_ext(basename(in_dir))
+z_tmp  <- file.path(local_temp, paste0(z_base, "_", Sys.getpid()))
+dir.create(z_tmp, showWarnings = FALSE, recursive = TRUE)
+
+unzip(in_dir, exdir = z_tmp)
+
+r_hist  <- rast(file.path(z_tmp, "Globio4_landuse_10sec_2020_World_crop_int.tif"))
+
+# check the frequency of original land-use values
+r2_hist <- classify(r_hist, rcl, others = NA)
+
+writeRaster(
+  r2_hist,
+  file.path(out_dir_hist, "Globio4_landuse_10sec_2020_World_crop_int_broad.tif"),
+  datatype = "INT1U",
+  NAflag = 255,
+  overwrite = TRUE,
+  wopt = list(gdal = c("COMPRESS=DEFLATE"))
+)
+```
+
