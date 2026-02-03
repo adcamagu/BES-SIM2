@@ -42,7 +42,7 @@ for (i in seq_along(broad_ids)) {
   writeRaster(
     bin_r, out,
     overwrite = TRUE,
-    datatype  = "INT1S",
+    datatype  = "INT1S", # Boolean datatype is not possible as it only allows for TRUE/FALSE categories. 0/1 binaries are better specified in "INT1S" and are stored in 8 bits (revised by Emma).
     NAflag    = -1,
     wopt = list(gdal = c("COMPRESS=DEFLATE"))
   )
