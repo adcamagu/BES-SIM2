@@ -16,13 +16,7 @@ Version 1.0, 29.01.2026 (Link to be created)
 
 This work is licensed under the Creative Commons Attribution 4.0 International License. To view a copy of this license, visit <http://creativecommons.org/licenses/by/4.0/> or send a letter to creative Commons PI Box 1866, Mountain View, CA 94042, USA.
 
-## Project location in the local server (I: drive at iDiv) and in NextCloud
-
-The BES-SIM 2 project files are stored in in the i: drive following `i:\biocon\Projects\BES-SIM 2\`.
-
-Within this folder there is a README containing the folder structure and and other relevant information for proper storage, tractability and replication.
-
-By storing it in the I: Drive, it is possible to mirror it and share it as read-only with the modelling teams through NextCloud. **NOTE:** Continuous password update are needed when working teams are no longer part of BES-SIM 2 (email from Christopher Zimmerman via [it-support\@idiv.de](mailto:it-support@idiv.de){.email} on the 23.01.2026 to Andres Mármol).
+All project data is hosted at iDiv and it is mirrored through NextCloud. **NOTE:** Continuous password update are needed when working teams are no longer part of BES-SIM 2 (email from Christopher Zimmerman via [it-support\@idiv.de](#0){.email} on the 23.01.2026 to Andres Mármol).
 
 # Code Folder
 
