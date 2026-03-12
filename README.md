@@ -16,7 +16,7 @@ Version 1.0, 29.01.2026 (Link to be created)
 
 This work is licensed under the Creative Commons Attribution 4.0 International License. To view a copy of this license, visit <http://creativecommons.org/licenses/by/4.0/> or send a letter to creative Commons PI Box 1866, Mountain View, CA 94042, USA.
 
-## Project location in the local server (iDiv Users Only)(I: drive at iDiv)
+## Project location in the local server (I: drive at iDiv) and in NextCloud
 
 The BES-SIM 2 project files are stored in in the i: drive following `i:\biocon\Projects\BES-SIM 2\`.
 
