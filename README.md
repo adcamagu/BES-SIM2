@@ -33,17 +33,17 @@ To process input datasets:
 ```         
 └─ Data_geo\
    ├─ climate_data\
-   │  └─ ISIMIP3b\
-   ├─ land_use\t
+   │  ├─ ISIMIP3b\
+   │  └─ WorldClim\
+   ├─ land_use\
    │  ├─ GLOBIO\
-   │  │  ├─ cubes\
+   │  │  ├─ cubes\          # GLOBIO BES-SIM 2 EBVcube .nc files
    │  │  ├─ raw\
-   │  │  └─ scripts\
+   │  │  └─ code\
    │  └─ PLUM\
-   │     ├─ cubes\
+   │     ├─ cubes\          # PLUM BES-SIM 2 EBVcube .nc files
    │     ├─ raw\
-   │     └─ scripts\
-   ├─ ne_110m_land\
+   │     └─ code\
    └─ protected_areas\
       ├─ GLOBIO-based_PAs\
       └─ PLUM-based_PAs\
@@ -53,20 +53,24 @@ For output files
 
 ```         
 └─ BES_results\
-   ├─ EBVcube_ensamble_Tutorial\
+   ├─ EBVcube_ensamble_Tutorial\   # outputs from this notebook
    ├─ results_biodiversity\
    │   ├─ Model1\
    │   │   ├─ EBVcubes\
+   │   │   ├─ figures\
    │   │   └─ reports\
    │   └─ Model2\
    │       ├─ EBVcubes\
+   │       ├─ figures\
    │       └─ reports\
    └─ results_ecosystems\
        ├─ Model3\
        │   ├─ EBVcubes\
+       │   ├─ figures\
        │   └─ reports\
        └─ Model4\
            ├─ EBVcubes\
+           ├─ figures\
            └─ reports\
 ```
 
