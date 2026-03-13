@@ -53,7 +53,7 @@ For output files
 
 ```         
 └─ BES_results\
-   ├─ EBVcube_ensamble_Tutorial\   # outputs from this notebook
+   ├─ EBVcube_ensamble_Tutorial\
    ├─ results_biodiversity\
    │   ├─ Model1\
    │   │   ├─ EBVcubes\
