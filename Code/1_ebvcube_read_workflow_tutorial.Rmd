@@ -1,18 +1,33 @@
 ---
-title: "Working with EBVcube Data: A Practical Workflow Guide"
-author: "Emmanuel Oceguera, Andres Marmol"
+title: "Working with EBVcube Data: A Practical Workflow Guide for BES-SIM 2"
+author: "Andrés Mármol-Guijarro, Emmanuel Oceguera"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    highlight: tango
+    number_sections: true
+    latex_engine: xelatex   # handles unicode characters
   html_document:
     toc: true
     toc_float: true
     toc_depth: 3
     theme: flatly
     highlight: tango
+    df_print: paged
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo    = TRUE,
+                      message = FALSE,
+                      warning = FALSE,
+                      fig.width  = 8,
+                      fig.height = 6,
+                      dpi        = 150,
+                      fig.align  = "center"   # centers all figures
+)
 ```
 
 ------------------------------------------------------------------------
@@ -35,7 +50,6 @@ rm(list = ls())
 library(ebvcube)
 library(terra)
 library(geodata)
-library(gdal)
 ```
 
 If BioConductor dependencies (`rhdf5`, `DelayedArray`, `HDF5Array`) are missing, install them via `BiocManager` before loading `ebvcube`.
@@ -190,7 +204,7 @@ Start by loading the properties of one file and inspecting the available slots:
 
 ```{r file-properties}
 globio05_dc <- ebv_properties(dc$globio_lu_05[1], verbose = FALSE)
-slotNames(globio)
+slotNames(globio05_dc)
 ```
 
 The `general` slot contains descriptive metadata — the title, a description of the dataset, and the list of entity names. Entity names are important because their index position maps directly to the `entity` argument in `ebv_read*` functions:
@@ -204,15 +218,15 @@ globio05_dc@general$entity_names   # entity index maps directly to the entity ar
 The `spatial` slot reports the coordinate reference system, cell resolution, and bounding extent of the grid:
 
 ```{r spatial-metadata}
-cat("EPSG:      ", globio@spatial$epsg,       "\n")
-cat("Resolution:", globio@spatial$resolution, "\n")
-cat("Extent:    ", globio@spatial$extent,     "\n")
+cat("EPSG:      ", globio05_dc@spatial$epsg,       "\n")
+cat("Resolution:", globio05_dc@spatial$resolution, "\n")
+cat("Extent:    ", globio05_dc@spatial$extent,     "\n")
 ```
 
 The `temporal` slot lists all available time steps as dates. This tells you the temporal coverage of the cube and helps you identify which `timestep` index to pass when reading a layer:
 
 ```{r temporal-metadata}
-cat(as.character(globio@temporal$dates), sep = "\n")
+cat(as.character(globio05_dc@temporal$dates), sep = "\n")
 ```
 
 **Note:** Not all EBV cubes have time steps. The protected area cubes for GLOBIO and LandSyMM-PLUM, for instance, contain only one mask layer per scenario with no associated year. This is an example of the latter.
@@ -235,7 +249,7 @@ The internal hierarchy is **Scenario → Metric → Entity** (scenarios are opti
 
 ```{r datacube-paths}
 globio05_paths <- ebv_datacubepaths(dc$globio_lu_05, verbose = FALSE)
-print(globio_paths)
+print(globio05_paths)
 ```
 
 In this file there are four scenarios — *Nature for Nature*, *Nature as Culture*, *Nature for Society*, and *SSP2-Baseline* — each containing the same metric (Land cover). The `datacubepaths` column gives the internal HDF5 path used to locate a specific cube within the file. This path is passed to subsequent functions to specify which cube to work with.
@@ -405,7 +419,7 @@ The `ebv_write()` function exports a subset or processed EBV object to disk as a
 The table below summarizes the available GeoTIFF data types supported by the `type` argument:
 
 | Code | Type | Bits | Range | Use Case |
-|-------------|-------------|-------------|-------------|-----------------------|
+|---------------|---------------|---------------|---------------|---------------|
 | INT1S | Signed integer | 8-bit | -128 to 127 | Compact categorical data |
 | INT2S | Signed integer | 16-bit | -32,768 to 32,767 | Elevation, temperature anomalies |
 | INT2U | Unsigned integer | 16-bit | 0 to 65,535 | Land cover classes, counts |
