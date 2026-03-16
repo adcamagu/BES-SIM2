@@ -2,21 +2,22 @@
 title: "Working with EBVcube Data: A Practical Workflow Guide for BES-SIM 2"
 author: "Andrés Mármol-Guijarro, Emmanuel Oceguera"
 date: "`r Sys.Date()`"
+site: bookdown::bookdown_site
 output:
-  pdf_document:
+  bookdown::pdf_book:
     toc: true
     toc_depth: 3
     highlight: tango
-    number_sections: true
-    latex_engine: xelatex   # handles unicode characters
-  html_document:
+    latex_engine: xelatex
+    number_sections: false
+  bookdown::html_document2:
     toc: true
     toc_float: true
     toc_depth: 3
     theme: flatly
     highlight: tango
     df_print: paged
-    number_sections: true
+    number_sections: false
 ---
 
 ```{r setup, include=FALSE}
@@ -326,7 +327,7 @@ At 10 arc-second resolution, a global layer contains approximately 1.3 billion c
 | `ebv_read_bb()` | Bounding box `c(xmin, xmax, ymin, ymax)` | Fast rectangular clip |
 | `ebv_read_shp()` | Path to a `.shp` file | Clips to boundary, masks exterior cells to `NA` |
 
-## 5.1 Bounding Box — EU Extent
+## 5.1 Bounding Box — Brazil Extent
 
 For the following exercise, we now switch to read `dc$globio_lu`. The bounding box below covers mainland EU in EPSG 4326.
 
@@ -369,7 +370,7 @@ br_subset <- ebv_read_bb(
 plot(br_subset)
 ```
 
-## 5.2 Shapefile Subset — EU Administrative Boundary
+## 5.2 Shapefile Subset — Brazil Administrative Boundary
 
 Subsetting the dataset using shapefiles, for instance of countries, is also possible. For this example, the dataset will be subset to be plotted within Brazilian boundaries. Shapefiles are downloaded using `geodata` package.
 
