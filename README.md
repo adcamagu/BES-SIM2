@@ -37,16 +37,22 @@ To process input datasets:
    │  └─ WorldClim\
    ├─ land_use\
    │  ├─ GLOBIO\
-   │  │  ├─ cubes\          # GLOBIO BES-SIM 2 EBVcube .nc files
-   │  │  ├─ raw\
-   │  │  └─ code\
+   │  │  ├─ code\             
+   │  │  ├─ cube\             # GLBOIO BES-SIM 2 EBVcube .nc files
+   │  │  └─ raw\
    │  └─ PLUM\
-   │     ├─ cubes\          # PLUM BES-SIM 2 EBVcube .nc files
-   │     ├─ raw\
-   │     └─ code\
+   │     ├─ code\             
+   │     ├─ cube\             # LandSyMM-PLUM BES-SIM 2 EBVcube .nc files
+   │     └─ raw\
    └─ protected_areas\
       ├─ GLOBIO-based_PAs\
+      │  ├─ code\             
+      │  ├─ cube\
+      │  └─ raw\
       └─ PLUM-based_PAs\
+         ├─ code\             
+         ├─ cube\
+         └─ raw\
 ```
 
 For output files
@@ -81,14 +87,14 @@ Raw data sets include: 1) land use projections; and 2) land use intensities for 
 Two modelling teams (three in the coming weeks) have submitted their land use projections as part of BES-SIM 2 and will be available in the following links:
 
 | ID | Title | DOI | Resolution | File |
-|----|----|----|----|----|
+|---------------|---------------|---------------|---------------|---------------|
 | 98 | Land Use projection (BES-SIM 2 GLOBIO) | TBD | 10 arc seconds | alkemade_ecostr_id98_20260223.nc |
 | 99 | Land Use projection (BES-SIM 2 LandSymm-PLUM) | TBD | 0.01 degrees | alexander_ecostr_id99_20260217.nc |
 
 In addition, two coarser versions of LandSyMM-PLUM and GLOBIO are provided.
 
 | ID | Title | DOI | Resolution | File |
-|----|----|----|----|----|
+|---------------|---------------|---------------|---------------|---------------|
 | 102 | Upscaled Land Use projections (BES-SIM 2 GLOBIO) | TBD | 0.5 degrees | alkemade_ecostr_id103_20260216.nc |
 | 103 | Upscaled 0.5 Land Use projections (BES-SIM 2 GLOBIO) | TBD | 0.5 degrees | alexander_ecostr_id102_20260309.nc\* |
 
@@ -97,11 +103,22 @@ In addition, two coarser versions of LandSyMM-PLUM and GLOBIO are provided.
 The other datasets are listed below
 
 | ID | Title | DOI | Resolution | File |
-|----|----|----|----|----|
+|---------------|---------------|---------------|---------------|---------------|
 | 100 | Forest management (BES-SIM 2 LandSyMM-PLUM) | TBD | 0.5 degrees | alexander_ecostr_id100_20260204.nc |
 | 101 | Crop areas and intensities (BES-SIM 2 LandSyMM-PLUM) | TBD | 0.5 degrees | alexander_croscut_id101_20260202.nc |
 
 A third data set from the modelling team at PIK using MAgPIE-REMIND model is also expected to be shared with the modelling teams.
+
+## ⛔⛔⛔ RESTRICTED DATA — BES-SIM 2 INTERNAL USE ONLY⛔⛔⛔
+
+The land use datasets in the repository are **strictly for internal BES-SIM 2 use** and **must not be shared with external teams or collaborators**.
+
+Data will be made available once: (1) Land use modelling teams have published their results (2) he BES-SIM 2 protocol paper is published.
+
+If in doubt, contact the data owners before sharing:
+
+**GLOBIO:** [Rob Alkemade (PBL)](rob.alkemade@pbl.nl)\
+LandSyMM-PLUM: [Peter Alexander (University of Edinburgh)](peter.alexander@ed.ac.uk)
 
 ### From raw to data cubes: processing original land use datasets:
 
@@ -114,7 +131,7 @@ Two different datasets of climate are available in the BES-SIM 2 NextCloud.
 1.  ISIMIP3b datasets derived from the ISPL-CM6A-LR. A total of 9 files for each climate scenario are provided to fill the full time extent. This means that for SSP1-RCP2.6 there are nine .nc files.
 
 | File naming | Format | Time extent | Resolution |
-|----|----|----|----|
+|------------------|------------------|------------------|------------------|
 | ipsl-cm6a-lr_r1i1p1f1_w5e5_ssp126_tas_global_daily | NetCDF | 2015-2100 | 0.5 degrees |
 | ipsl-cm6a-lr_r1i1p1f1_w5e5_ssp245_tas_global_daily | NetCDF | 2015-2100 | 0.5 degrees |
 | ipsl-cm6a-lr_r1i1p1f1_w5e5_ssp460_tas_global_daily | NetCDF | 2015-2100 | 0.5 degrees |
@@ -122,7 +139,7 @@ Two different datasets of climate are available in the BES-SIM 2 NextCloud.
 2.  WorldClim datasets derived from ISPL-CM6A-LR.
 
 | Name                                             | Time extent | Resolution |
-|--------------------------------------------------|-------------|------------|
+|------------------------------------|------------------|------------------|
 | wc2.1_10m_bioc_IPSL-CM6A-LR_ssp126_2021-2040.tif | 2015-2100   | 10 min     |
 | wc2.1_10m_bioc_IPSL-CM6A-LR_ssp126_2041-2060.tif | 2015-2100   | 10 min     |
 | wc2.1_10m_bioc_IPSL-CM6A-LR_ssp126_2061-2080.tif | 2015-2100   | 10 min     |
@@ -138,7 +155,7 @@ Two different datasets of climate are available in the BES-SIM 2 NextCloud.
 Protected area layers used by each land use modelling team are available in BES-SIM 2 NextCloud at `\Data_geo\protected_areas`. These layers are model specific and are listed in the table below:
 
 | Model         | Scenarios                | File                               |
-|---------------|--------------------------|------------------------------------|
+|------------------|-----------------------|-------------------------------|
 | GLOBIO        | NfN & NfS                | alkemade_ecostr_idTBD_20260309.nc  |
 | LandSyMM-PLUM | NfN, NfNl, NfS, NaC, BAU | alexander_ecostr_idTBD_20260306.nc |
 
