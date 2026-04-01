@@ -1,0 +1,307 @@
+---
+title: "PLUM Land Use projections - EBV Cube"
+author: "Emmanuel Oceguera Conchas"
+date: "2026-02-03"
+output: 
+  html_document:
+    df_print: paged
+  pdf_document: default  
+---
+
+## Introduction
+
+The aim of this workflow is to create an EBV Cube (netCDF) file for PLUM Land use (ID 99) 
+that can be uploaded to the EBV Data Portal. We convert each land-use class into 
+a binary presence/absence layer (1/0) and store each class as an EBV entity. 
+
+In each file, there are multiple land use (e.g. urban, cropland, etc) as bands of the .tif.
+Ocean and water are excluded from the entity list and are also masked to NA 
+before binarizatio.
+
+
+This datasates is diveded into scenarios:
+- Each folder under `S:\\ebv_portal\\99\\data\\` represents a scenario
+  - Business as usual (BAU)
+  - Nature as Culture (NaC_NaC)
+  - Nature for Society (NfS_NfS)
+  - Nature for Nature (NfN_NfN)
+  - Nature for Nature local (NfNl_NfNl)
+
+The scenario order in the netCDF is enforced to match the
+scenario order in the metadata JSON.
+
+In each scenario there are multiple years
+- Each .tff file is a multiband, where each band corresponds to a year
+  - 2020
+  - 2030
+  - 2050
+  - 2070
+  - 2100
+
+- Each `land_cover` class is transformed into a binary raster:
+  - `1` = presence
+  - `0` = absence
+  - `NA` is preserved
+
+- The datatype
+  - INT1U as a byte (0/1)
+
+
+
+```{r}
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+
+###  Clean environment and load libraries
+Note: If any of the packages are not installed, uncomend lines.
+```{r, eval=FALSE}
+# Clean environment
+rm(list = ls())
+gc()
+
+# install.packages("terra")
+# install.packages("ebvcube")
+# install.packages("future.apply")
+library(ebvcube)
+library(terra)
+library(stringr)
+library(dplyr)
+library(future.apply)
+
+```
+### Terra temp settings and load libraries
+The temp folder should be placed where there is nough memory space
+
+```{r, eval=FALSE}
+# Defile local temp folder
+local_tmp <- "D:\\Emma\\temp"
+dir.create(local_tmp, showWarnings = FALSE, recursive = TRUE)
+
+# Terra temp settings
+terraOptions(
+  todisk  = TRUE,
+  memfrac = 0.3,
+  tempdir = local_tmp
+)
+
+```
+
+
+### Define paths
+```{r, eval=FALSE}
+# Define ID and date for the file name
+id <- 99
+date <- "20260212"
+
+# Define root paths, json and output
+root <- paste0("I:\\ebv_portal\\", id) # biocon\\
+js   <- file.path(root, "metadata.json")
+nc <- paste0("S:\\ebv_portal\\", id, "\\alexander_ecostr_id", id, "_", date, ".nc")
+
+
+# Define .tif root and list .tif files
+tif_root  <- file.path("S:\\ebv_portal", id, "data")
+tif_files <- list.files(tif_root, pattern="\\.tif$", recursive=TRUE, full.names=TRUE)
+cat(paste0("Path: ", tif_files, "\n"), "\n")
+```
+
+### Specify parameters
+```{r, eval=FALSE}
+# Define scenarios and years
+scenario_levels <- c("NfN", "NfNl", "NaC", "NfS", "BAU")
+years <- c(2021, 2030, 2050, 2070, 2100)
+timesteps <- as.character(years)
+
+cat("Scenarios:", paste(scenario_levels, collapse=", "), "\n")
+cat("Years:", paste(timesteps, collapse=", "), "\n")
+```
+### Define EBV cube structure and create empty NetCDF file
+```{r, eval=FALSE}
+# Get general spatial-temporal setting
+r0 <- rast(tif_files[1])
+datatype  <- datatype(r0[[1]])
+extent <- as.vector(ext(r0))
+res_xy  <- res(r0)
+epsg    <- 4326
+
+# Get levels/entitites from the raste 
+class <- terra::levels(r0[[1]])
+print(class[[1]])
+
+# Get all entities
+entitites_df <- as.data.frame(class[[1]])
+class_id    <- as.integer(entitites_df$id)
+class_names <- as.character(entitites_df$land_cover)
+
+# Remove ocean, water and no data from the entities list
+entities <- class_names[!(class_id %in% c(0, 77, 99))]
+cat("Entities to be included in the EBV cube:\n", paste("-", entities, "\n"), "\n")
+
+
+# Create empty EBV file
+fillvalue <- -1
+prec <- "byte"
+
+ebv_create(
+  jsonpath   = js,
+  outputpath = nc,
+  entities   = entities,
+  epsg       = epsg,
+  extent     = extent,
+  resolution = res_xy,
+  timesteps  = timesteps,
+  fillvalue  = fillvalue,
+  prec       = prec,
+  force_4D   = TRUE,
+  overwrite  = TRUE,
+  verbose    = TRUE
+)
+
+cat("EBV cube created at:", nc, "\n")
+
+```
+
+### Create binary rasters in parallel
+Note: Before running this chunk verify the capacitites of your machine to adjust
+  the pla() function in terms of workers.
+  
+```{r, eval=FALSE}
+
+# Define values for masking
+mask_ids <- c(0, 99, 77)
+
+# Build a job table
+jobs <- expand.grid(
+  s_no = seq_along(scenario_levels),
+  t_no = seq_along(timesteps),
+  e_no = seq_along(class_id),
+  KEEP.OUT.ATTRS = FALSE
+)
+
+
+# Use 3 multisessions to process in parallel
+plan(multisession, workers = 3)
+
+# Helper to make safe filenames
+safe_name <- function(x) gsub("[^A-Za-z0-9_]+", "_", x)
+
+# Create all binary tif files in parallel
+out_paths <- future_sapply(seq_len(nrow(jobs)), function(i) {
+
+  s_no <- jobs$s_no[i]
+  t_no <- jobs$t_no[i]
+  e_no <- jobs$e_no[i]
+
+  sc <- scenario_levels[s_no]
+  yr <- timesteps[t_no]
+  code <- class_id[e_no]
+  ent  <- entities[e_no]
+
+  path_sc <- tif_files[grepl(paste0("_", sc, "_"), basename(tif_files))]
+  if (length(path_sc) != 1) stop("Expected exactly 1 tif for scenario ", sc, " got ", length(path_sc))
+
+  r <- rast(path_sc)
+  r_t <- r[[t_no]]
+
+  # mask water/ocean/nodata
+  r_t_masked <- ifel(is.na(r_t), NA, ifel(r_t %in% mask_ids, NA, r_t))
+
+  # TRUE presence, FALSE absence, NA for masked
+  bin_r <- ifel(is.na(r_t_masked), NA, ifel(r_t_masked == code, 1, 0))
+
+  out_tif <- file.path(local_tmp, "bin", sc, yr, paste0(safe_name(ent), ".tif"))
+  dir.create(dirname(out_tif), showWarnings = FALSE, recursive = TRUE)
+
+  writeRaster(
+    bin_r, out_tif,
+    overwrite = TRUE,
+    datatype  = "INT1S",
+    NAflag    = -1,
+    wopt      = list(gdal = c("COMPRESS=DEFLATE"))
+  )
+
+  out_tif
+})
+
+plan(sequential)
+```
+
+
+### Populate EBV cube with data
+In this process, entities are saved in temp folder,
+```{r, eval=FALSE}
+
+# Check propeties
+props <- ebv_properties(nc)
+n_entities <- length(props@general$entity_names)
+
+# Define metric
+metric_no <- 1
+
+# loop through each scenario
+for (s_no in seq_along(scenario_levels)) {
+  sc <- scenario_levels[s_no]
+  
+  # Loop through each timestep
+  for (t_no in seq_along(timesteps)) {
+    yr <- timesteps[t_no]
+    
+    
+    cat("\n=== INSERT | scenario:", sc, "| year:", yr, "===\n")
+    
+    
+    e_start <- 1
+    # Loop through each entity
+    for (e_no in e_start:n_entities) {
+      
+      code <- entities[e_no]
+      
+      cat("Entity:", entities[e_no], " (code ", code, ")\n")
+      
+      # Create a temporary file on the local disk
+      tmp_tif <- file.path(local_tmp, "bin", sc, yr, paste0(gsub("[ /]", "_", entities[e_no]), ".tif"))
+      
+      # Check if exists
+      if (!file.exists(tmp_tif)) {
+        stop("Temporary file not found: ", tmp_tif)
+      }
+
+      # Add data to the nc file, using one byte per pixel
+      ebv_add_data(
+        filepath_nc = nc,
+        entity      = e_no,
+        timestep    = t_no,
+        data        = tmp_tif,
+        band        = 1,
+        scenario    = s_no,
+        metric      = 1,
+        ignore_RAM  = FALSE,
+        raw         = FALSE,
+                verbose     = FALSE
+      )
+      # Print that entitiy is inserted
+      cat("✔", entities[e_no], "- Entity added to EBV cube\n")
+    }
+    
+    # Free up R Memory
+    rm(r_t)
+    gc()
+  }
+}
+
+```
+
+### Quick vallidation and visualization
+```{r, eval=FALSE}    
+ebv_analyse(nc, entity=1, timestep=1, scenario=1, metric=1)
+props <- ebv_properties(nc, scenario=1, metric=1)
+props@ebv_cube$type
+props@general$entity_names
+# Define data cube
+datacubes <- ebv_datacubepaths(nc, verbose=FALSE)
+# Simple plot
+ebv_map(filepath = nc, datacubepath = datacubes[1,1], entity = 1,
+        timestep = 1, classes = 2, verbose = FALSE)
+```
+    
