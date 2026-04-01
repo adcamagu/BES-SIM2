@@ -1,0 +1,44 @@
+values,broad_id,description,broader_category
+1,1,Urban,Urban
+2,1,Urban parks,Urban
+190,1,Urban areas,Urban
+10,3,Crop (unknown whether intensive/extensive),Cropland
+11,3,Crop intensive,Cropland
+12,3,Crop extensive,Cropland
+13,5,Natural vegetation,Potential secondary vegetation
+14,5,Natural vegetation,Potential secondary vegetation
+15,7,Agroforestry,Agroforestry
+21,9,Pasture,Pasture
+22,11,Rangeland,Rangeland
+30,13,Forestry,Forestry
+40,15,Secondary vegetation,Secondary vegetation
+50,17,"Tree cover, broadleaved, evergreen, closed to open (>15%)",Unmanaged forest
+60,17,"Tree cover, broadleaved, deciduous, closed to open (>15%)",Unmanaged forest
+61,17,"Tree cover, broadleaved, deciduous, closed (>40%)",Unmanaged forest
+62,17,"Tree cover, broadleaved, deciduous, open (15?40%)",Unmanaged forest
+70,17,"Tree cover, needleleaved, evergreen, closed to open (>15%)",Unmanaged forest
+71,17,"Tree cover, needleleaved, evergreen, closed (>40%)",Unmanaged forest
+72,17,"Tree cover, needleleaved, evergreen, open (15?40%)",Unmanaged forest
+80,17,"Tree cover, needleleaved, deciduous, closed to open (>15%)",Unmanaged forest
+81,17,"Tree cover, needleleaved, deciduous, closed (>40%)",Unmanaged forest
+82,17,"Tree cover, needleleaved, deciduous, open (15?40%)",Unmanaged forest
+90,17,"Tree cover, mixed leaf type (broadleaved and needleleaved)",Unmanaged forest
+100,17,Mosaic tree and shrub (>50%) / herbaceous cover (<50%),Unmanaged forest
+110,17,Mosaic herbaceous cover (>50%) / tree and shrub (<50%),Unmanaged forest
+160,17,"Tree cover, flooded, fresh or brakish water",Unmanaged forest
+170,17,"Tree cover, flooded, saline water",Unmanaged forest
+180,17,"Shrub or herbaceous cover, flooded, fresh/saline/brakish water",Unmanaged forest
+120,19,Shrubland,Shrubland/Grassland
+121,19,Evergreen shrubland,Shrubland/Grassland
+122,19,Deciduous shrubland,Shrubland/Grassland
+130,19,Grassland,Shrubland/Grassland
+150,19,"Sparse vegetation (tree, shrub, herbaceous cover) (<15%)",Shrubland/Grassland
+151,19,Sparse tree (<15%),Shrubland/Grassland
+152,19,Sparse shrub (<15%),Shrubland/Grassland
+153,19,Sparse herbaceous cover (<15%),Shrubland/Grassland
+140,21,Lichens and mosses,Other
+200,23,Bare areas,Bare Areas
+201,23,Consolidated bare areas,Bare Areas
+202,23,Unconsolidated bare areas,Bare Areas
+210,-1,Water bodies,Water bodies
+220,-1,Permanent snow and ice,Permanent snow and ice
