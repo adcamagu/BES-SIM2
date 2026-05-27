@@ -96,7 +96,7 @@ In addition, two coarser versions of LandSyMM-PLUM and GLOBIO are provided.
 | ID | Title | DOI | Resolution | File |
 |---------------|---------------|---------------|---------------|---------------|
 | 102 | Upscaled Land Use projections (BES-SIM 2 GLOBIO) | TBD | 0.5 degrees | alkemade_ecostr_id103_20260216.nc |
-| 103 | Upscaled 0.5 Land Use projections (BES-SIM 2 GLOBIO) | TBD | 0.5 degrees | alexander_ecostr_id102_20260309.nc\* |
+| 103 | Upscaled 0.5 Land Use projections (BES-SIM 2 LandSymm-PLUM) | TBD | 0.5 degrees | alexander_ecostr_id102_20260309.nc\* |
 
 \*dataset needs to be updated to its latest version
 
