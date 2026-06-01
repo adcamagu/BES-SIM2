@@ -1,0 +1,411 @@
+---
+title: "Protected_areas_Plum_to-cube_260220"
+author: "Magali Weissgerber"
+date: "2026-02-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Librairies
+
+```{r}
+
+library(terra)
+library(jsonlite)
+library(ncdf4)
+
+install.packages("remotes")
+library(remotes)
+#installation of the latest development version from GitHub
+remotes::install_github('https://github.com/EBVCube/ebvcube/tree/dev')
+
+library(ebvcube)
+
+
+```
+
+## Exploring the files
+
+```{r}
+
+# Look at the first 20 lines in the .asc file
+readLines("I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/WDPA_Jul2025.asc", n = 20)
+
+# Look at the first 20 lines in the .asc file
+r <- rast("I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/WDPA_Jul2025.asc")
+r
+plot(r)
+
+# List all .asc files in "/protected_areas/PLUM-based_PAs"
+list.files("I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs", pattern = "\\.asc$", full.names = TRUE)
+# List all .asc files in "/protected_areas/PLUM-based_PAs"
+list.files("I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/PA_masks", pattern = "\\.asc$", full.names = TRUE)
+# They are the same, let's work with "I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/PA_masks"
+
+
+```
+
+## Convert all .asc to .tif
+
+NB: values are multiplied by 100 so that they are integrer and not floats (it saves space)
+
+```{r}
+
+# Path to your folder containing .asc files
+PLUM_based_PAs_folder <- "I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/raw"
+
+# List all .asc files (full paths)
+asc_files <- list.files(PLUM_based_PAs_folder, pattern = "\\.asc$", full.names = TRUE)
+
+# Loop to convert each .asc to a .tif
+for (f in asc_files) {
+  
+  # Read the ascii grid
+  r <- rast(f)
+  
+  # Extract base name without extension
+  base <- tools::file_path_sans_ext(basename(f))
+  
+  # ---- SPECIAL CASE: change name of base PAs from WDPA_Jul2025.asc → PLUM_mask_BAU_merge.tif ----
+  # This is because it helps automate adding data to the .nc
+  if (base == "WDPA_Jul2025") {
+    out_name <- "PLUM_mask_BAU_merge.tif"
+  } else {
+    out_name <- paste0(base, ".tif")
+  }
+  
+  # Build output path
+  out_path <- file.path(PLUM_based_PAs_folder, out_name)
+  
+  # Write GeoTIFF
+  writeRaster(r, out_path, overwrite = TRUE)
+}
+
+```
+
+## built and export the .json file
+
+```{r}
+
+# ---- BUILD FULL EBV JSON STRUCTURE ----
+
+PLUM_PA_cubes_json <- list(
+  
+  code = "",
+  message = "Preliminary metadata",
+  
+  data = list(
+    
+    id = "",
+    naming_authority = "The German Centre for Integrative Biodiversity Research (iDiv) Halle-Jena-Leipzig",
+    title = "Protected areas (BES-SIM 2 PLUM)",
+    product_version = "pending",
+    doi = "pending",
+    date_created = "2025-07-27",
+    date_issued = "pending",
+    summary = "Protection status of land built from the Nature Future scenarios of biodiversity and ecosystem services (BES)",
+    keywords = "pending",
+    references = "N/A",
+    
+    source = "Protected area maps from the PLUM model are linearly interpolated from a common starting protected area distribution (WDPA), to the scenario protected area map, over time.  Based on the total fraction of a cell to be protected at a given timestep, PLUM protects land covers by priotising barren&natural classes, forest classes, agricultural classes. See also UNEP WCMC.",
+    
+    coverage_content_type = "AuxiliaryInformation",
+    project_name = "BES-SIM 2; Biofutures",
+    project_url = "https://bes-sim.org/",
+    
+    creator = list(
+      creator_name = "Peter Alexander",
+      creator_email = "peter.alexander@ed.ac.uk",
+      creator_institution = "University of Edinburgh",
+      creator_url = "https://orcid.org/0000-0001-6010-1186"
+    ),
+    
+    contributor_name = "Jay Burn, Bart Arendarczyk",
+    
+    license = "https://creativecommons.org/licenses/by/4.0",
+    
+    publisher = list(
+      publisher_name = "Magali Weissgerber",
+      publisher_email = "magali.weissgerber@idiv.de",
+      publisher_institution = "German Centre for Integrative Biodiversity Research (iDiv)",
+      publisher_url = "https://orcid.org/0000-0002-2999-055X"
+    ),
+    
+    ebv = list(
+      ebv_class = "Cross-cutting",
+      ebv_name = "Cross-cutting"
+    ),
+    
+    ebv_entity = list(
+      ebv_entity_type = "Global protected areas",
+      ebv_entity_scope = "This dataset contains the protection status of land, expressed as the share of area protected in the cells of the grid. It is derived from the PLUM land use allocation module. Layers are scenario specific.",
+      ebv_entity_classification_name = "WDPA",
+      ebv_entity_classification_url = "https://www.protectedplanet.net/en/thematic-areas/wdpa?tab=WDPA",
+      ebv_entity_names = "Protection status", 
+      ebv_entity_taxonomy_levels = "pending",
+      ebv_entity_taxonomy_table = "pending"
+    ),
+    
+    ebv_metric = list(
+      ebv_metric_1 = list(
+        `:standard_name` = "Protection status",
+        `:long_name` = "Land protection records whether protected areas occur within the grid (e.g. percentage of protected areas within 0.5 degrees grid) for a given scenario. Values have been multiplied by 100 for the cube. Divide them by 100 before use",
+        `:units` = "percentage of the grid"
+      )
+    ),
+    
+    ebv_scenario = list(
+      ebv_scenario_classification_name = "The scenarios were built based on the values of nature outlined in the Nature Futures Framework for BES-SIM 2",
+      ebv_scenario_classification_version = "N/A",
+      ebv_scenario_classification_url = "N/A",
+      
+      ebv_scenario_1 = list(
+        `:standard_name` = "NfN",
+        `:long_name` = ""
+      ),
+      ebv_scenario_2 = list(
+        `:standard_name` = "NfN_local",
+        `:long_name` = ""
+      ),
+      ebv_scenario_3 = list(
+        `:standard_name` = "NfS",
+        `:long_name` = ""
+      ),
+      ebv_scenario_4 = list(
+        `:standard_name` = "NaC",
+        `:long_name` = ""
+      ),
+      ebv_scenario_5 = list(
+        `:standard_name` = "BAU",
+        `:long_name` = ""
+      )
+    ),
+    
+    ebv_geospatial = list(
+      ebv_geospatial_scope = "Global",
+      ebv_geospatial_description = "N/A"
+    ),
+    
+    geospatial_lat_resolution = "pending",
+    geospatial_lon_resolution = "pending",
+    geospatial_bounds_crs = "pending",
+    geospatial_lat_min = "pending",
+    geospatial_lon_min = "pending",
+    geospatial_lat_max = "pending",
+    geospatial_lon_max = "pending",
+    
+    time_coverage = list(
+      time_coverage_resolution = "Single time",
+      time_coverage_start = "N/A",
+      time_coverage_end = "N/A"
+    ),
+    
+    ebv_domain = "Terrestrial",
+    comment = "N/A",
+    
+    dataset = list(
+      pathname = "pending",
+      download = "pending",
+      metadata_json = "pending",
+      metadata_xml = "pending"
+    ),
+    
+    file = list(
+      download = "pending"
+    )
+  )
+)
+
+# ---- WRITE JSON TO FILE ----
+
+write_json(PLUM_PA_cubes_json, "PLUM_PA_cubes_metadata.json", pretty = TRUE, auto_unbox = TRUE)
+
+# ---- ExPORT JSON ----
+
+output_folder <- "I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/scripts"
+
+write_json(
+  PLUM_PA_cubes_json,
+  file.path(output_folder, "PLUM_PA_cubes_metadata.json"),
+  pretty = TRUE,
+  auto_unbox = TRUE
+)
+
+```
+
+## Build nc
+
+# 1. Define paths ----
+
+```{r}
+
+# Path to EBV metadata as JSON
+json <- "I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/scripts/PLUM_PA_cubes_metadata.json"
+json_data <- fromJSON(txt=json) # in case you want to read the jsonfile
+
+# Path to Tiffs
+pathin <- "I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/PA_masks" #if error: add one dot and try again
+
+# Path to the EBVCube output
+nc <- file.path("I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/cubes/alexander_ecostr_idTBD_20260306.nc")
+
+```
+
+# 2. Plot data and check data ----
+
+```{r}
+
+# Define scenario names
+scenarios <- c('NfN', 'NfN_local', 'NfS', 'NaC', 'BAU')
+
+# Define entities names
+entities <- c('Protection status')
+
+# Define metric names 
+metrics <- c('Protection status')
+
+# Build all valid combinations
+grid <- expand.grid(
+  scenario = scenarios,
+  entities = entities,
+  metrics   = metrics,
+  stringsAsFactors = FALSE
+)
+
+# Build filenames
+grid$tif <- paste0(
+  "PLUM_mask", "_",
+  grid$scenario, "_", "merge", ".tif"
+)
+
+# Build full paths
+grid$path <- file.path(
+  pathin,
+  grid$tif
+)
+
+# Check which files actually exist
+grid$exists <- file.exists(grid$path)
+
+# Inspect missing files
+grid[!grid$exists, ]
+
+# Create "tif_paths" object
+tif_paths <- grid$path
+
+# Explore one of the tif files
+rin <- rast(tif_paths[2])
+plot(rin)
+
+```
+
+# 3. Create EBVCube netCDF ----
+
+```{r}
+
+# Defining the fillvalue - optional
+fv <- -3.4e+38
+
+# Define geographical extent and coordinate system
+extent <- c(ext(rin)[1], ext(rin)[2], ext(rin)[3], ext(rin)[4])
+res <- res(rin)
+epsg <- crs(rin, describe = TRUE)$code #EPSG code
+#prec <- 'integrer' # to be adapted based on data type
+#sep <- ','
+crs(rin)
+
+# Create the netCDF structure (no data yet)
+ebv_create(jsonpath = json,
+        outputpath = nc,
+        entities = entities, #alternative: csv (see help-page)
+        epsg = 4326,
+        extent = extent,
+        resolution = res,
+        timesteps = "2000-01-01",
+        fillvalue = fv, # setting fill value was necessary to create the nc
+        #prec = prec,
+        overwrite = TRUE,
+        verbose = FALSE #set to TRUE to see additional messages
+        )
+
+# Check out the (still empty) datacubes that are available
+dc_new <- ebv_datacubepaths(nc, verbose=FALSE)
+print(dc_new)
+
+# Check metadata
+prop <- ebv_properties(nc, scenario = 1, metric = 1, verbose=FALSE)
+print(prop@spatial)
+```
+
+# 4. Add data to the netCDF ----
+
+```{r}
+
+# to fill all cubes, loop though all metrics, done with a table
+ebv_datacubepaths(nc)
+
+# Check the grid
+head(grid)
+
+# Loop to fill the cubes
+
+for (i in seq_len(nrow(grid))) {
+  
+  path <- grid$path[i]
+  
+  if (!file.exists(path)) {
+    warning("Missing file: ", path)
+    next
+  }
+  
+  ebv_add_data(
+    filepath_nc = nc,
+    metric      = grid$metrics[i],     
+    scenario    = grid$scenario[i],   
+    entity      = grid$entities[i],          
+    timestep    = "2000-01-01",
+    data        = grid$path[i],
+    band        = 1
+  )
+  
+  message("Added: ",
+          grid$scenario_ebv[i], " | ",
+          grid$metric_ebv[i], " | ",
+          grid$entity[i])
+}
+
+# Check .nc metadata for the first .nc that included multiplication by 100 
+# Path to the EBVCube output
+nc_post_add_data1 <- nc_open("I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/cubes/bes-sim2_plum_PA.nc")
+nc_post_add_data1$var
+sapply(nc_post_add_data1$var, function(x) x$prec)
+
+# Check .nc metadata for the second .nc without multiplication by 100 
+# Path to the EBVCube output
+nc_post_add_data2 <- nc_open("I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/cubes/alexander_ecostr_idTBD_20260306.nc")
+nc_post_add_data2$var
+sapply(nc_post_add_data2$var, function(x) x$prec)
+
+
+```
+
+## Title
+
+```{r}
+
+
+
+
+```
+
+## Title
+
+```{r}
+
+
+
+
+```

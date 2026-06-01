@@ -1,0 +1,94 @@
+{
+  "code": "",
+  "message": "Preliminary metadata",
+  "data": {
+    "id": "",
+    "naming_authority": "The German Centre for Integrative Biodiversity Research (iDiv) Halle-Jena-Leipzig",
+    "title": "Protected areas (BES-SIM 2 GLOBIO, 0.5 degree)",
+    "product_version": "pending",
+    "doi": "pending",
+    "date_created": "_____",
+    "date_issued": "pending",
+    "summary": "Protection status of land expressed as suitability for land use change from the GLOBIO model. This\n    version is aggregated to a 0.5 degree spatial resolution for the BES-SIM 2 Nature Futures scenarios.",
+    "keywords": "pending",
+    "references": "N/A",
+    "source": "Protected area maps expressed as the suitability for land use change from the GLOBIO model",
+    "coverage_content_type": "modelResult",
+    "project_name": "BES-SIM 2",
+    "project_url": "https://bes-sim.org/",
+    "creator": {
+      "creator_name": "Rob Alkemade",
+      "creator_email": "rob.alkemade@pbl.nl",
+      "creator_institution": "PBL Netherlands Environmental Assessment Agency",
+      "creator_url": "https://orcid.org/rob.alkemade@pbl.nl"
+    },
+    "contributor_name": "Michel Bakkanes",
+    "license": "https://creativecommons.org/licenses/by/4.0",
+    "publisher": {
+      "publisher_name": "Magali Weissgerber",
+      "publisher_email": "magali.weissgerber@idiv.de",
+      "publisher_institution": "German Centre for Integrative Biodiversity Research (iDiv)",
+      "publisher_url": "https://orcid.org/0000-0002-2999-055X"
+    },
+    "ebv": {
+      "ebv_class": "Cross-cutting",
+      "ebv_name": "Cross-cutting"
+    },
+    "ebv_entity": {
+      "ebv_entity_type": "Protection as suitability for LU change",
+      "ebv_entity_scope": "This dataset contains the protection status of land as the suitability for land use change. Protection corresponds to a suitability value of 0.",
+      "ebv_entity_classification_name": "pending",
+      "ebv_entity_classification_url": "pending",
+      "ebv_entity_names": "Suitability",
+      "ebv_entity_taxonomy_levels": "pending",
+      "ebv_entity_taxonomy_table": "pending"
+    },
+    "ebv_metric": {
+      "ebv_metric_1": {
+        ":standard_name": "Suitability for LU change",
+        ":long_name": "Land protection records whether a grid cell is suitable for land use change. Original raster values are 0 (protection), 95 and 100. In this 0.5 degree product, values represent the mean aggregated suitability across all input cells.",
+        ":units": "mean suitability score"
+      }
+    },
+    "ebv_scenario": {
+      "ebv_scenario_classification_name": "The scenarios were built based on the values of nature outlined in the Nature Futures Framework for BES-SIM 2. Protection only applies to NfN and NfS.",
+      "ebv_scenario_classification_version": "N/A",
+      "ebv_scenario_classification_url": "N/A",
+      "ebv_scenario_1": {
+        ":standard_name": "Nature for Nature",
+        ":long_name": "Nature for Nature"
+      },
+      "ebv_scenario_2": {
+        ":standard_name": "Nature for Society",
+        ":long_name": "Nature for Society"
+      }
+    },
+    "ebv_geospatial": {
+      "ebv_geospatial_scope": "Global",
+      "ebv_geospatial_description": "N/A"
+    },
+    "geospatial_lat_resolution": "pending",
+    "geospatial_lon_resolution": "pending",
+    "geospatial_bounds_crs": "pending",
+    "geospatial_lat_min": "pending",
+    "geospatial_lon_min": "pending",
+    "geospatial_lat_max": "pending",
+    "geospatial_lon_max": "pending",
+    "time_coverage": {
+      "time_coverage_resolution": "Single time",
+      "time_coverage_start": "2070-01-01",
+      "time_coverage_end": "2070-01-01"
+    },
+    "ebv_domain": "Terrestrial",
+    "comment": "0.5 degree mean-aggregated version of the original GLOBIO-based protected area suitability rasters.",
+    "dataset": {
+      "pathname": "pending",
+      "download": "pending",
+      "metadata_json": "pending",
+      "metadata_xml": "pending"
+    },
+    "file": {
+      "download": "pending"
+    }
+  }
+}
