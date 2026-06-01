@@ -51,3 +51,9 @@ rsconnect/
 #folders I don't want to sync
 Temporal_files/
 
+# NetCDF files
+*.nc
+
+# Raw data subfolders
+**/raw/
+
