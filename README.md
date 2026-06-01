@@ -38,8 +38,7 @@ To process input datasets:
 ```         
 └─ Data_geo\
    ├─ climate_data\
-   │  ├─ ISIMIP3b\
-   │  └─ WorldClim\
+   │  └─ Decadal BIOCLIM estimates based on ISIMIP3b\
    ├─ land_use\
    │  ├─ GLOBIO\
    │  │  ├─ code\
@@ -54,14 +53,15 @@ To process input datasets:
    │     ├─ cube\
    │     └─ raw\
    └─ protected_areas\
-      ├─ GLOBIO-based_PAs\
-      │  ├─ code\
-      │  ├─ cube\
-      │  └─ raw\
-      └─ PLUM-based_PAs\
-         ├─ code\
-         ├─ cube\
-         └─ raw\
+   │  ├─ GLOBIO-based_PAs\
+   │  │  ├─ code\
+   │  │  ├─ cube\
+   │  │  └─ raw\
+   │  └─ PLUM-based_PAs\
+   │     ├─ code\
+   │     ├─ cube\
+   │     └─ raw\
+   └─ tutorial_code           # Code example on how to read an EBVcuve .nc file
 ```
 
 For output files
@@ -97,8 +97,11 @@ Two modelling teams (three in the coming weeks) have submitted their land use pr
 
 | ID | Title | DOI | Resolution | File |
 |---------------|---------------|---------------|---------------|---------------|
+|  |  |  |  |  |
+|  |  |  |  |  |
 | 98 | Land Use projection (BES-SIM 2 GLOBIO) | TBD | 10 arc seconds | alkemade_ecostr_id98_20260223.nc |
 | 99 | Land Use projection (BES-SIM 2 LandSymm-PLUM) | TBD | 0.01 degrees | alexander_ecostr_id99_20260217.nc |
+| 105 | Land use projections (BES-SIM 2 ScenMIP-CMIP7) | TBD | 0.25 degrees | chini_ecostr_id105_20260325.nc |
 
 In addition, two coarser versions of LandSyMM-PLUM and GLOBIO are provided.
 
@@ -115,8 +118,9 @@ The other datasets are listed below
 |---------------|---------------|---------------|---------------|---------------|
 | 100 | Forest management (BES-SIM 2 LandSyMM-PLUM) | TBD | 0.5 degrees | alexander_ecostr_id100_20260204.nc |
 | 101 | Crop areas and intensities (BES-SIM 2 LandSyMM-PLUM) | TBD | 0.5 degrees | alexander_croscut_id101_20260202.nc |
-
-A third data set from the modelling team at PIK using MAgPIE-REMIND model is also expected to be shared with the modelling teams.
+| 106 | Forestry management (BES-SIM 2 ScenMIP-CMIP7) | TBD | 0.25 degrees | chini_ecoser_id106_20260325.nc |
+| 107 | Crop management and land use intensity (BES-SIM 2 CMIP7) | TBD | 0.25 degrees | chini_ecoser_id107_20260410.nc |
+| 108 | Secondary vegetation state (BES-SIM 2 ScenarioMIP CMIP7) | TBD | 0.25 degrees | chini_ecofun_id108_20260417.nc |
 
 ## ⛔⛔⛔ RESTRICTED DATA — BES-SIM 2 INTERNAL USE ONLY⛔⛔⛔
 
@@ -127,7 +131,8 @@ Data will be made available once: (1) Land use modelling teams have published th
 If in doubt, contact the data owners before sharing:
 
 **GLOBIO:** [Rob Alkemade (PBL)](rob.alkemade@pbl.nl)\
-LandSyMM-PLUM: [Peter Alexander (University of Edinburgh)](peter.alexander@ed.ac.uk)
+LandSyMM-PLUM: [Peter Alexander (University of Edinburgh)](peter.alexander@ed.ac.uk)\
+ScenMIP-CMIP7: Louise Chini ([University of Maryland](https://geog.umd.edu/facultyprofile/chini/louise))
 
 ### From raw to data cubes: processing original land use datasets:
 
@@ -140,7 +145,7 @@ Two different datasets of climate are suggested to be used in BES-SIM 2.
 1.  **ISIMIP3B datasets derived from the ISPL-CM6A-LR.** The datasets include mean (tas), minimum (tasmin) and maximum (tasmax) air surface temperature, precipitation (pr), near surface relative humidity (hurs), near surface specific humidity (huss), etc. All datasets are found as NetCDFs, spanning from 2015-2100 and at a 0.5 degree resolution. The following table summarises climate data for the Shared Socioeconomic Pathways to be tested in BES-SIM 2 and their links to ISIMIP3b repository.
 
     | SSP-RCP | Link |
-    |---------------|---------------------------------------------------------|
+    |------------------|------------------------------------------------------|
     | SSP1-RCP2.6 | <https://data.isimip.org/search/tree/ISIMIP3b/InputData/climate/atmosphere/ipsl-cm6a-lr/ssp126/> |
     | SSP2-RCP4.5 | <https://data.isimip.org/search/tree/ISIMIP3b/SecondaryInputData/climate/atmosphere/ipsl-cm6a-lr/ssp245/> |
     | SSP4-RCP6.0 | <https://data.isimip.org/search/tree/ISIMIP3b/SecondaryInputData/climate/atmosphere/ipsl-cm6a-lr/ssp460/> |
@@ -150,13 +155,13 @@ Two different datasets of climate are suggested to be used in BES-SIM 2.
 2.  **WorldClim datasets derived from ISPL-CM6A-LR.** Worldclim datasets variables available are monthly average minimum temperature (°C) (tn), monthly average maximum temperature (°C) (tx), monthly total precipitation (mm) (pr), and bioclimatic variables (bc), for the periods 2021-2040, 2041-2060, 2061-2080 and 2081-2100 for SSP1-RCP2.6 and SSP2-RCP4.5 that will be used in BES-SIM 2. Datasets are available at different resolutions and they are summarised in the folllowing table.
 
     | Spatial Resolution | Links |
-    |--------------------|----------------------------------------------------|
+    |----------------------|--------------------------------------------------|
     | 30 seconds | <https://www.worldclim.org/data/cmip6/cmip6_clim30s.html> |
     | 2.5 minutes | <https://www.worldclim.org/data/cmip6/cmip6_clim2.5m.html> |
     | 5 minutes | <https://www.worldclim.org/data/cmip6/cmip6_clim5m.html> |
     | 10 minutes | <https://www.worldclim.org/data/cmip6/cmip6_clim10m.html> |
 
-**NOTE:** Worldclim bioclim datasets do not have projections for SSP4-RCP6.0, posing a challenge for modelling teams aiming to run this scenario in their exercises.
+**NOTE:** Additional BIOCLIM datasets have been provided by Martin Jung. These come from all GCMs in ISIMIP3b. For the inter-model comparison , we recommend to run ISPL-CM6A-LR
 
 ### Protected areas
 
