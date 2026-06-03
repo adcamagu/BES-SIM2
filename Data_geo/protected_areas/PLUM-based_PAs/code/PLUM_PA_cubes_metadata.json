@@ -1,0 +1,106 @@
+{
+  "code": "",
+  "message": "Preliminary metadata",
+  "data": {
+    "id": "",
+    "naming_authority": "The German Centre for Integrative Biodiversity Research (iDiv) Halle-Jena-Leipzig",
+    "title": "Protected areas (BES-SIM 2 PLUM)",
+    "product_version": "pending",
+    "doi": "pending",
+    "date_created": "2025-07-27",
+    "date_issued": "pending",
+    "summary": "Protection status of land built from the Nature Future scenarios of biodiversity and ecosystem services (BES)",
+    "keywords": "pending",
+    "references": "N/A",
+    "source": "Protected area maps from the PLUM model are linearly interpolated from a common starting protected area distribution (WDPA), to the scenario protected area map, over time.  Based on the total fraction of a cell to be protected at a given timestep, PLUM protects land covers by priotising barren&natural classes, forest classes, agricultural classes. See also UNEP WCMC.",
+    "coverage_content_type": "AuxiliaryInformation",
+    "project_name": "BES-SIM 2; Biofutures",
+    "project_url": "https://bes-sim.org/",
+    "creator": {
+      "creator_name": "Peter Alexander",
+      "creator_email": "peter.alexander@ed.ac.uk",
+      "creator_institution": "University of Edinburgh",
+      "creator_url": "https://orcid.org/0000-0001-6010-1186"
+    },
+    "contributor_name": "Jay Burn, Bart Arendarczyk",
+    "license": "https://creativecommons.org/licenses/by/4.0",
+    "publisher": {
+      "publisher_name": "Magali Weissgerber",
+      "publisher_email": "magali.weissgerber@idiv.de",
+      "publisher_institution": "German Centre for Integrative Biodiversity Research (iDiv)",
+      "publisher_url": "https://orcid.org/0000-0002-2999-055X"
+    },
+    "ebv": {
+      "ebv_class": "Cross-cutting",
+      "ebv_name": "Cross-cutting"
+    },
+    "ebv_entity": {
+      "ebv_entity_type": "Global protected areas",
+      "ebv_entity_scope": "This dataset contains the protection status of land, expressed as the share of area protected in the cells of the grid. It is derived from the PLUM land use allocation module. Layers are scenario specific.",
+      "ebv_entity_classification_name": "WDPA",
+      "ebv_entity_classification_url": "https://www.protectedplanet.net/en/thematic-areas/wdpa?tab=WDPA",
+      "ebv_entity_names": "Protection status",
+      "ebv_entity_taxonomy_levels": "pending",
+      "ebv_entity_taxonomy_table": "pending"
+    },
+    "ebv_metric": {
+      "ebv_metric_1": {
+        ":standard_name": "Protection status",
+        ":long_name": "Land protection records whether protected areas occur within the grid (e.g. percentage of protected areas within 0.5 degrees grid) for a given scenario. Values have been multiplied by 100 for the cube. Divide them by 100 before use",
+        ":units": "percentage of the grid"
+      }
+    },
+    "ebv_scenario": {
+      "ebv_scenario_classification_name": "The scenarios were built based on the values of nature outlined in the Nature Futures Framework for BES-SIM 2",
+      "ebv_scenario_classification_version": "N/A",
+      "ebv_scenario_classification_url": "N/A",
+      "ebv_scenario_1": {
+        ":standard_name": "NfN",
+        ":long_name": ""
+      },
+      "ebv_scenario_2": {
+        ":standard_name": "NfN_local",
+        ":long_name": ""
+      },
+      "ebv_scenario_3": {
+        ":standard_name": "NfS",
+        ":long_name": ""
+      },
+      "ebv_scenario_4": {
+        ":standard_name": "NaC",
+        ":long_name": ""
+      },
+      "ebv_scenario_5": {
+        ":standard_name": "BAU",
+        ":long_name": ""
+      }
+    },
+    "ebv_geospatial": {
+      "ebv_geospatial_scope": "Global",
+      "ebv_geospatial_description": "N/A"
+    },
+    "geospatial_lat_resolution": "pending",
+    "geospatial_lon_resolution": "pending",
+    "geospatial_bounds_crs": "pending",
+    "geospatial_lat_min": "pending",
+    "geospatial_lon_min": "pending",
+    "geospatial_lat_max": "pending",
+    "geospatial_lon_max": "pending",
+    "time_coverage": {
+      "time_coverage_resolution": "Single time",
+      "time_coverage_start": "N/A",
+      "time_coverage_end": "N/A"
+    },
+    "ebv_domain": "Terrestrial",
+    "comment": "N/A",
+    "dataset": {
+      "pathname": "pending",
+      "download": "pending",
+      "metadata_json": "pending",
+      "metadata_xml": "pending"
+    },
+    "file": {
+      "download": "pending"
+    }
+  }
+}

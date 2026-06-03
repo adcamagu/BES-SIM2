@@ -1,0 +1,436 @@
+---
+title: "Protected_areas_GLOBIO_to-cube_260227.Rmd"
+author: "Magali Weissgerber"
+date: "2026-02-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Librairies
+
+```{r}
+
+### This script needs to be cleaned
+# R.version
+
+# install.packages("terra")
+# install.packages("tidyterra")
+
+library(terra)
+library(jsonlite)
+# install.packages("remotes")
+# library(remotes)
+# install.packages("devtools")
+#library(devtools)
+
+#installation of the latest development version from GitHub
+#remotes::install_github('https://github.com/EBVCube/ebvcube/tree/dev')
+
+
+# install.packages("BiocManager")
+# library(BiocManager)
+
+
+
+# install.packages("rhdf5")
+# library(rhdf5)
+# library(rlang)
+# 
+# install.packages("ebvcube")
+# packageVersion("ebvcube")
+library(ebvcube)
+# remove.packages("terra")
+
+terraOptions(
+  todisk  = TRUE,
+  memfrac = 0.3,
+  tempdir = "D:\\Emmanuel_Oceguera\\temp"
+)
+
+
+```
+
+## Exploring the files
+
+```{r}
+
+# List all .tif files in "/protected_areas/GLOBIO-based_PAs"
+list.files("I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/GLOBIO-based_PAs/aligned_tifs_byte", pattern = "\\.tif$", full.names = TRUE)
+
+```
+
+## built and export the .json file
+
+```{r}
+
+library(jsonlite)
+
+# ---- BUILD FULL EBV JSON STRUCTURE ----
+
+GLOBIO_PA_cubes_json <- list(
+  
+  code = "",
+  message = "Preliminary metadata",
+  
+  data = list(
+    
+    id = "",
+    naming_authority = "The German Centre for Integrative Biodiversity Research (iDiv) Halle-Jena-Leipzig",
+    title = "Protected areas (BES-SIM 2 GLOBIO)",
+    product_version = "pending",
+    doi = "pending",
+    date_created = "_____",
+    date_issued = "pending",
+    summary = "Protection status of land expressed as the suitability for land use change built from the three Sustainable Development Pathways and reinterpreted to fit the Nature Future scenarios of biodiversity and ecosystem services (BES)",
+    keywords = "pending",
+    references = "N/A",
+    
+    source = "Protected area maps expressed as the suitability for land use change from the GLOBIO model",
+    
+    coverage_content_type = "modelResult",
+    project_name = "BES-SIM 2",
+    project_url = "https://bes-sim.org/",
+    
+    creator = list(
+      creator_name = "Rob Alkemade",
+      creator_email = "rob.alkemade@pbl.nl",
+      creator_institution = "PBL Netherlands Environmental Assessment Agency",
+      creator_url = "https://orcid.org/rob.alkemade@pbl.nl"
+    ),
+    
+    contributor_name = "Michel Bakkanes",
+    
+    license = "https://creativecommons.org/licenses/by/4.0",
+    
+    publisher = list(
+      publisher_name = "Magali Weissgerber",
+      publisher_email = "magali.weissgerber@idiv.de",
+      publisher_institution = "German Centre for Integrative Biodiversity Research (iDiv)",
+      publisher_url = "https://orcid.org/0000-0002-2999-055X"
+    ),
+    
+    ebv = list(
+      ebv_class = "Cross-cutting",
+      ebv_name = "Cross-cutting"
+    ),
+    
+    ebv_entity = list(
+      ebv_entity_type = "Protection as suitability for LU change",
+      ebv_entity_scope = "This dataset contains the protection status of land as the suitability for land use change. Protection corresponds to a suitability value of 0.",
+      ebv_entity_classification_name = "pending",
+      ebv_entity_classification_url = "pending",
+      ebv_entity_names = "Suitability",
+      ebv_entity_taxonomy_levels = "pending",
+      ebv_entity_taxonomy_table = "pending"
+    ),
+    
+    ebv_metric = list(
+      ebv_metric_1 = list(
+        `:standard_name` = "Suitability for LU change",
+        `:long_name` = "Land protection records whether a grid cell is suitable for land use change. There are three possible values: 0 (protection), 0.95 and 1 (both unprotected with two levels of suitability).",
+        `:units` = "probability multiplied by 100"
+      )
+    ),
+    
+    ebv_scenario = list(
+      ebv_scenario_classification_name = "The scenarios were built based on the values of nature outlined in the Nature Futures Framework for BES-SIM 2. Protection only applies to NfN and NfS.",
+      ebv_scenario_classification_version = "N/A",
+      ebv_scenario_classification_url = "N/A",
+      
+      ebv_scenario_1 = list(
+        `:standard_name` = "Nature for Nature",
+        `:long_name` = "Nature for Nature"
+      ),
+      
+      ebv_scenario_2 = list(
+        `:standard_name` = "Nature for Society",
+        `:long_name` = "Nature for Society"
+      )
+    ),
+    
+    ebv_geospatial = list(
+      ebv_geospatial_scope = "Global",
+      ebv_geospatial_description = "N/A"
+    ),
+    
+    geospatial_lat_resolution = "pending",
+    geospatial_lon_resolution = "pending",
+    geospatial_bounds_crs = "pending",
+    geospatial_lat_min = "pending",
+    geospatial_lon_min = "pending",
+    geospatial_lat_max = "pending",
+    geospatial_lon_max = "pending",
+    
+    time_coverage = list(
+      time_coverage_resolution = "Single time",
+      time_coverage_start = "N/A",
+      time_coverage_end = "N/A"
+    ),
+    
+    ebv_domain = "Terrestrial",
+    comment = "N/A",
+    
+    dataset = list(
+      pathname = "pending",
+      download = "pending",
+      metadata_json = "pending",
+      metadata_xml = "pending"
+    ),
+    
+    file = list(
+      download = "pending"
+    )
+  )
+)
+
+# ---- WRITE JSON TO FILE ----
+
+write_json(GLOBIO_PA_cubes_json, "GLOBIO_PA_cubes_metadata.json",
+           pretty = TRUE, auto_unbox = TRUE)
+
+# ---- EXPORT JSON ----
+#biocon/
+output_folder <- "I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/scripts"
+
+write_json(
+  GLOBIO_PA_cubes_json,
+  file.path(output_folder, "GLOBIO_PA_cubes_metadata.json"),
+  pretty = TRUE,
+  auto_unbox = TRUE
+)
+
+```
+
+## Build nc
+
+# 1. Define paths ----
+
+```{r}
+
+# Path to EBV metadata as JSON
+#biocon/
+json_globio <- "I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/scripts/GLOBIO_PA_cubes_metadata.json"
+# json_globio_data <- fromJSON(txt=json_globio) # in case you want to read the jsonfile
+
+#biocon/
+# Path to Tiffs
+pathin_globio <- "I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/GLOBIO-based_PAs/aligned_tifs_byte" #if error: add one dot and try again
+#biocon/
+
+# Path to the EBVCube output
+nc_globio <- file.path("I:/biocon/Projects/BES-SIM 2/Data_geo/protected_areas/PLUM-based_PAs/cubes/alkemade_ecostr_idTBD_20260227.nc")
+
+```
+
+# 2. Plot data and check data ----
+
+```{r}
+
+# Define valid scenario–approach pairs
+scenario_approach <- data.frame(
+  scenario   = c("Nature for Nature", "Nature for Society"),
+  approach = c("HE", "WE"),
+  stringsAsFactors = FALSE
+)
+
+# Define other dimensions
+entities <- "Suitability"
+metrics  <- "Suitability for LU change"
+
+# Build only valid combinations
+grid_globio <- merge(
+  scenario_approach,
+  expand.grid(
+    entities = entities,
+    metrics  = metrics,
+    stringsAsFactors = FALSE
+  )
+)
+
+# Build filenames
+grid_globio$tif <- paste0(
+  "pa_reduce", "_",
+  grid_globio$approach, "_", "2070", ".tif"
+)
+
+# Build full paths
+grid_globio$path <- file.path(
+  pathin_globio,
+  grid_globio$tif
+)
+
+# Check which files actually exist
+grid_globio$exists <- file.exists(grid_globio$path)
+
+# Inspect missing files
+grid_globio[!grid_globio$exists, ]
+
+# Create "tif_paths" object
+tif_paths <- grid_globio$path
+
+# Explore one of the tif files
+globio_NfN <- rast(tif_paths[1])
+ext(globio_NfN)
+globio_NfS <- rast(tif_paths[2])
+# plot(globio_NfS)
+ext(globio_NfS)
+
+```
+
+# 3. Create EBVCube netCDF ----
+# Defining the fillvalue - optional
+```{r}
+# 3. Create EBVCube netCDF ----
+# Defining the fillvalue - optional
+# fv <- -3.4e+38
+fv = -1
+
+# Define geographical extent and coordinate system
+
+#extent1 <- c(ext(globio_NfN)[1], ext(globio_NfN)[2], ext(globio_NfN)[3], ext(globio_NfN)[4])
+#ext(globio_NfN)
+# crs <- crs(globio_NfN)
+
+res1 <- res(globio_NfS)
+ext <- as.vector(ext(globio_NfN))
+epsg <- 4326
+prec <- "byte"
+
+# prec <- "float" # to be adapted based on data type
+
+# extent <- c(ext(globio_NfS)[1], ext(globio_NfS)[2], ext(globio_NfS)[3], ext(globio_NfS)[4])
+# ext(globio_NfS)
+# crs(globio_NfS)
+
+# 
+# res2 <- res(globio_NfS)
+# res2
+# crs(rin_globio)
+# epsg <- crs(globio_NfN) #EPSG code
+# epsg <- 4326
+# prec <- "float" # to be adapted based on data type
+# sep <- ','
+
+
+
+# Create the netCDF structure (no data yet)
+ebv_create(
+  jsonpath = json_globio,
+  outputpath = nc_globio,
+  entities = entities, #alternative: csv (see help-page)
+  epsg = epsg,
+  # extent = extent,
+  extent = c(-180, 180.000000000029, -90.0000000000144, 90.0000000000002),
+  #extent = c(-180, 180, -90, 90),
+  resolution = res1,
+  timesteps = "2000-01-01",
+  fillvalue = fv, # setting fill value was necessary to create the nc
+  prec = prec,
+  force_4D = TRUE,
+  overwrite = TRUE,
+  verbose = FALSE #set to TRUE to see additional messages
+  )
+
+# Check out the (still empty) datacubes that are available
+dc_new <- ebv_datacubepaths(nc_globio, verbose=TRUE)
+print(dc_new)
+
+# Check metadata
+prop <- ebv_properties(nc_globio, scenario = 1, metric = 1, verbose=TRUE)
+print(prop@spatial)
+```
+
+# 4. Add data to the netCDF ----
+
+```{r}
+
+ebv_properties(
+  nc_globio,
+  datacubepath = "scenario_1/metric_1/ebv_cube"
+)@ebv_cube
+
+# to fill all cubes, loop though all metrics, done with a table
+# ebv_datacubepaths(nc_globio)
+
+# Check the grid
+head(grid_globio)
+
+# Loop to fill the cubes
+
+for (i in seq_len(nrow(grid_globio))) {
+  
+  path <- grid_globio$path[i]
+  
+  if (!file.exists(path)) {
+    warning("Missing file: ", path)
+    next
+  }
+
+  ebv_add_data(
+    filepath_nc = nc_globio,
+    metric      = 1,
+    scenario    = grid_globio$scenario[i],
+    entity      = grid_globio$entities[i],
+    timestep    = 1,
+    data        = path,
+    band        = 1,
+    ignore_RAM = TRUE,
+    raw = TRUE,
+    verbose = FALSE
+  )
+  gc()
+  rm(path)
+  message("Added: ",
+          grid_globio$scenario[i], " | ",
+          grid_globio$metrics[i], " | ",
+          grid_globio$entities[i])
+}
+
+# # Test to solve errors
+# traceback()
+# options(error = recover)
+# ?ebv_add_data
+# ebv_properties(nc_globio)@general$entity_names
+# str(ebv_properties(nc_globio))
+# ebv_properties(nc_globio)@metric
+# ebv_properties(nc_globio)@general
+# ebv_datacubepaths(nc_globio)
+# ebv_properties(
+#   nc_globio,
+#   datacubepath = "scenario_1/metric_1/ebv_cube"
+# )
+
+```
+
+
+
+## Title
+
+```{r}
+
+
+
+
+```
+
+## Title
+
+```{r}
+
+
+
+
+```
+
+## Title
+
+```{r}
+
+
+
+
+```
+
