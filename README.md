@@ -6,7 +6,7 @@ This repository, and its releases be will be available to download from Zenodo.
 
 ## Authors
 
-Henrique M. Pereira, Andres Marmol-Guijarro, Emmanuel Oceguera, Magali Weissgerber and Gavin Stark.
+Henrique M. Pereira, Andres Marmol-Guijarro, Emmanuel Oceguera-Conchas, Magali Weissgerber and Gavin Stark.
 
 ## Version history
 
@@ -101,7 +101,7 @@ Two modelling teams (three in the coming weeks) have submitted their land use pr
 |  |  |  |  |  |
 | 98 | Land Use projection (BES-SIM 2 GLOBIO) | TBD | 10 arc seconds | alkemade_ecostr_id98_20260223.nc |
 | 99 | Land Use projection (BES-SIM 2 LandSymm-PLUM) | TBD | 0.01 degrees | alexander_ecostr_id99_20260217.nc |
-| 105 | Land use projections (BES-SIM 2 ScenMIP-CMIP7) | TBD | 0.25 degrees | chini_ecostr_id105_20260325.nc |
+| 105 | Land use projections (BES-SIM 2 ScenarioMIP-CMIP7) | TBD | 0.25 degrees | chini_ecostr_id105_20260325.nc |
 
 In addition, two coarser versions of LandSyMM-PLUM and GLOBIO are provided.
 
@@ -116,9 +116,9 @@ The other datasets are listed below
 |---------------|---------------|---------------|---------------|---------------|
 | 100 | Forest management (BES-SIM 2 LandSyMM-PLUM) | TBD | 0.5 degrees | alexander_ecostr_id100_20260204.nc |
 | 101 | Crop areas and intensities (BES-SIM 2 LandSyMM-PLUM) | TBD | 0.5 degrees | alexander_croscut_id101_20260202.nc |
-| 106 | Forestry management (BES-SIM 2 ScenMIP-CMIP7) | TBD | 0.25 degrees | chini_ecoser_id106_20260325.nc |
-| 107 | Crop management and land use intensity (BES-SIM 2 CMIP7) | TBD | 0.25 degrees | chini_ecoser_id107_20260410.nc |
-| 108 | Secondary vegetation state (BES-SIM 2 ScenarioMIP CMIP7) | TBD | 0.25 degrees | chini_ecofun_id108_20260417.nc |
+| 107 | Crop management and land use intensity (BES-SIM 2 ScenarioMIP-CMIP7) | TBD | 0.25 degrees | chini_ecoser_id107_20260410.nc |
+| 108 | Secondary vegetation state (BES-SIM 2 ScenarioMIP-CMIP7) | TBD | 0.25 degrees | chini_ecofun_id108_20260417.nc |
+| 109 | Forestry management (BES-SIM 2 ScenarioMIP-CMIP7) | TBD | 0.25 degrees | chini_ecoser_id109_20260325.nc |
 
 ## ⛔⛔⛔ RESTRICTED DATA — BES-SIM 2 INTERNAL USE ONLY⛔⛔⛔
 
