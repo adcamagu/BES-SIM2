@@ -124,7 +124,7 @@ The other datasets are listed below
 
 The land use datasets in the repository are **strictly for internal BES-SIM 2 use** and **must not be shared with external teams or collaborators**.
 
-Data will be made available once: (1) Land use modelling teams have published their results (2) he BES-SIM 2 protocol paper is published.
+Data will be made available once: (1) Land use modelling teams have published their results (2) The BES-SIM 2 protocol paper is published.
 
 If in doubt, contact the data owners before sharing:
 
