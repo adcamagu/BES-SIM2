@@ -1,0 +1,378 @@
+---
+title: "PLUM Land-Use – Binarization and EBV Cube Generation"
+author: "Emmanuel Oceguera-Conchas, Andres Marmol-Guijarro"
+date: 03-02-2026
+output: html_document
+---
+
+## 1. Introduction
+
+This workflow processes high-resolution PLUM land-use maps and converts them into an EBV Cube NetCDF file.
+
+The PLUM maps come at a resolution of 0.01° (approx. 1 km at the equator), with one band per year and pixel values coded as land-use classes. Each class is converted into a binary presence/absence layer and stored as an EBV entity, while ocean, water, and NoData are excluded from the entity list and masked to `NA` before binarization.
+
+The workflow comprises two core steps:
+
+-   *Binarization:* Each land-use class is converted into a binary raster (1 for presence, 0 for absence).
+
+-   *EBV Cube NetCDF file generation:* The binary rasters are structured into an EBV Cube, organizing the data by scenario, metric, time step, and entity (the land-use class).
+
+In the notebook, these steps span four sections: preparing the working environment (loading `terra`, `ebvcube`, `stringr`, `dplyr`, `future.apply` and setting paths), building the EBV Cube structure, creating the binary entity rasters, and populating it. The result is a high-resolution product; a companion workflow produces the equivalent dataset at 0.5° resolution.
+
+### 1.1 PLUM scenarios and time steps
+
+The workflow processes five PLUM scenarios across five years each.
+
+| Scenario                  | Abbreviation | Available Years              |
+|---------------------------|--------------|------------------------------|
+| Business as usual         | BAU          | 2021, 2030, 2050, 2070, 2100 |
+| Nature as Culture         | NaC          | 2021, 2030, 2050, 2070, 2100 |
+| Nature for Society        | NfS          | 2021, 2030, 2050, 2070, 2100 |
+| Nature for Nature         | NfN          | 2021, 2030, 2050, 2070, 2100 |
+| Nature for Nature (local) | NfNl         | 2021, 2030, 2050, 2070, 2100 |
+
+### 1.2 Before you start
+
+Make sure the following are in place:
+
+-   The PLUM land-use maps — one categorical, year-banded GeoTIFF per scenario, in the expected folder structure
+-   The dataset's `metadata.json` file (Obtain from the [EBV Data Portal](https://portal.geobon.org/datasets))
+-   Enough temporary disk space for raster processing
+-   A working `ebvcube` install, plus `terra`, `stringr`, `dplyr`, and `future.apply`
+
+```{r}
+# note: Set cache = FALSE when re-running after changes to input data or paths
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+## 2. Load libraries
+
+Here we load the packages used throughout the workflow: `terra` for raster processing (reading, masking, binarizing, writing), `ebvcube` for creating and filling the EBV Cube NetCDF file, `stringr` and `dplyr` for string handling and data preparation, and `future.apply` for parallel binarization.
+
+### 2.1 Clean environment and load libraries
+
+If required, install the missing packages before running the workflow.
+
+```{r}
+# Clean environment
+rm(list = ls())
+gc()
+
+# install.packages("terra")
+# install.packages("ebvcube")
+# install.packages("stringr")
+# install.packages("dplyr")
+# install.packages("future.apply")
+
+library(ebvcube)
+library(terra)
+library(stringr)
+library(dplyr)
+library(future.apply)
+
+```
+
+## 3. Configure temporary raster storage
+
+Binarization can write a lot of temporary data to disk, so point `terra` at a drive with enough free space.
+
+```{r}
+
+local_temp <- "D:/temp" # Define local disk
+dir.create(local_temp, showWarnings = FALSE, recursive = TRUE)
+
+terraOptions(
+  todisk  = TRUE,
+  memfrac = 0.3,
+  tempdir = local_temp 
+)
+
+cat("Local temporary folder: ", local_temp)
+
+```
+
+## 4. Define input and output paths
+
+Input: the folder of PLUM land-use maps.\
+Output: the EBV Cube NetCDF file (named in [Section 6](#sec-6.-create-ebv-cube-netcdf-file)).
+
+```{r}
+# Define ID and date for the file name
+id <- 99
+
+# Folder containing the input land-use maps (one per scenario)
+tif_root <- file.path("S:/ebv_portal", id, "data")
+
+cat("ID:", id, "\n")
+cat("Maps folder:", tif_root, "\n")
+
+```
+
+## 5. Define the main workflow settings
+
+Set the scenarios, years, and masking values to process. The scenario order here must match the scenario order in the metadata JSON.
+
+```{r}
+# Scenario order written to the NetCDF (must match the metadata JSON)
+scenario_levels <- c("NfN", "NfNl", "NaC", "NfS", "BAU")
+
+# Years (band order in the input maps; the first time step is 2021)
+years     <- c(2021, 2030, 2050, 2070, 2100)
+timesteps <- as.character(years)
+
+# Values masked to NA (ocean / water / nodata) and excluded from entities
+mask_ids <- c(0, 77, 99)
+
+cat("Scenarios:", paste(scenario_levels, collapse = ", "), "\n")
+cat("Years:", paste(timesteps, collapse = ", "), "\n")
+```
+
+## 6. Create EBV Cube NetCDF file {#sec-6.-create-ebv-cube-netcdf-file}
+
+### 6.1 Check paths and available maps
+
+Define the metadata JSON and the target NetCDF file, and confirm the PLUM land-use maps are present in the expected folder. This check catches missing inputs before the cube is built.
+
+```{r}
+# Define date and check id
+creation_date <- "20260212"
+cat("Created date:", format(as.Date(creation_date, format = "%Y%m%d")), "\n")
+cat("ID:", id, "\n")
+
+# Define paths
+root <- paste0("I:/ebv_portal/", id)
+js   <- file.path(root, "metadata.json")
+
+# Note:
+# Please follow the naming convention
+# "<first_author>_<ebv_class>_id<ID>_<YYYYMMDD>.nc"
+nc <- paste0("S:/ebv_portal/", id, "/alexander_ecostr_id", id, "_", creation_date, ".nc")
+
+cat("EBV Cube NetCDF file name:", basename(nc), "\n")
+cat("Maps folder:", tif_root, "\n")
+
+# List all maps
+tif_files <- list.files(tif_root, pattern = "\\.tif$", recursive = TRUE, full.names = TRUE)
+
+cat("Total GeoTIFF maps found:", length(tif_files), "\n")
+```
+
+### 6.2 Define EBV Cube structure
+
+Define the cube's spatial, temporal, and thematic components: entities, extent and resolution, CRS, time steps, fill value, and data precision. Entities here are the land-use classes read from the maps' category table, with ocean, water, and NoData removed.
+
+```{r}
+# Spatio-temporal setting
+r0     <- rast(tif_files[1])
+extent <- as.vector(ext(r0))
+res_xy <- res(r0)
+epsg   <- 4326
+
+cat("Spatio-temporal settings\n")
+cat("=======================\n")
+list(timesteps = years, extent = extent, res = res_xy, epsg = epsg)
+
+# Entity names from the raster category table
+class <- terra::levels(r0[[1]])
+print(class[[1]])
+
+entities_df <- as.data.frame(class[[1]])
+class_id    <- as.integer(entities_df$id)
+class_names <- as.character(entities_df$land_cover)
+
+# Remove ocean, water and NoData from the entity list
+entities <- class_names[!(class_id %in% mask_ids)]
+
+cat("Entity names:", paste(entities, collapse = ", "), "\n")
+cat("Entities number:", length(entities), "\n")
+
+# Fill value and datatype
+fillvalue <- -1
+prec      <- "byte"
+```
+
+### 6.3 Create empty NetCDF file
+
+Create the empty NetCDF file from the properties defined above. It holds the cube structure but no raster data yet — that comes in [Section 8](#sec-8.-populate-the-ebv-cube).
+
+```{r}
+cat("Creating EBV Cube NetCDF\n")
+cat("=======================\n")
+
+ebv_create(
+  jsonpath   = js,
+  outputpath = nc,
+  entities   = entities,
+  epsg       = epsg,
+  extent     = extent,
+  resolution = res_xy,
+  timesteps  = timesteps,
+  fillvalue  = fillvalue,
+  prec       = prec,
+  force_4D   = TRUE,
+  overwrite  = TRUE,
+  verbose    = TRUE
+)
+
+cat("EBV cube created at:", nc, "\n")
+```
+
+## 7. Binarization
+
+Each map cell holds a land-use class code. For the EBV Cube, each class is split into its own binary raster: `1` where the class is present, `0` elsewhere. Each class is one EBV entity, so each binary raster is one entity layer in the final cube.
+
+Processing runs in parallel over scenario-year combinations. Each worker reads one scenario map, masks ocean/water/NoData to `NA`, and writes its binary entity rasters to the temporary folder. This is faster but uses more memory, so set the number of workers to match your available RAM and CPU.
+
+```{r}
+# Build a job table (scenario x timestep x entity)
+jobs <- expand.grid(
+  s_no = seq_along(scenario_levels),
+  t_no = seq_along(timesteps),
+  e_no = seq_along(class_id),
+  KEEP.OUT.ATTRS = FALSE
+)
+
+plan(multisession, workers = 3) # Check available CPU resources
+
+# Helper to make safe filenames
+safe_name <- function(x) gsub("[^A-Za-z0-9_]+", "_", x)
+
+# Create all binary tif files in parallel
+out_paths <- future_sapply(seq_len(nrow(jobs)), function(i) {
+
+  s_no <- jobs$s_no[i]
+  t_no <- jobs$t_no[i]
+  e_no <- jobs$e_no[i]
+
+  sc   <- scenario_levels[s_no]
+  yr   <- timesteps[t_no]
+  code <- class_id[e_no]
+  ent  <- entities[e_no]
+
+  path_sc <- tif_files[grepl(paste0("_", sc, "_"), basename(tif_files))]
+  if (length(path_sc) != 1) stop("Expected exactly 1 tif for scenario ", sc, " got ", length(path_sc))
+
+  r   <- rast(path_sc)
+  r_t <- r[[t_no]]
+
+  # Mask water / ocean / nodata
+  r_t_masked <- ifel(is.na(r_t), NA, ifel(r_t %in% mask_ids, NA, r_t))
+
+  # 1 = presence, 0 = absence, NA for masked
+  bin_r <- ifel(is.na(r_t_masked), NA, ifel(r_t_masked == code, 1, 0))
+
+  out_tif <- file.path(local_tmp, "bin", sc, yr, paste0(safe_name(ent), ".tif"))
+  dir.create(dirname(out_tif), showWarnings = FALSE, recursive = TRUE)
+
+  writeRaster(
+    bin_r, out_tif,
+    overwrite = TRUE,
+    datatype  = "INT1S",
+    NAflag    = -1,
+    wopt      = list(gdal = c("COMPRESS=DEFLATE"))
+  )
+
+  out_tif
+})
+
+plan(sequential)
+
+```
+
+## 8. Populate the EBV Cube {#sec-8.-populate-the-ebv-cube}
+
+Insert the binary rasters into the cube one by one. For each scenario and time step, the workflow reads each entity raster from the temporary folder and places it at its correct scenario / time step / entity position.
+
+```{r}
+# Get the properties and entities
+props      <- ebv_properties(nc)
+n_entities <- length(props@general$entity_names)
+
+# Define metric
+metric_no <- 1
+
+cat("Entities in netCDF:", n_entities, "\n")
+
+start.time <- Sys.time()
+for (s_no in seq_along(scenario_levels)) {
+
+  sc <- scenario_levels[s_no]
+
+  for (t_no in seq_along(timesteps)) {
+
+    yr <- timesteps[t_no]
+
+    cat("\n=== INSERT | scenario:", sc, "| year:", yr, "===\n")
+
+    for (e_no in seq_len(n_entities)) {
+
+      tif_in <- file.path(
+        local_tmp, "bin", sc, yr,
+        paste0(gsub("[ /]", "_", entities[e_no]), ".tif")
+        )
+
+      if (!file.exists(tif_in)) {
+        stop("Missing entity file: ", tif_in)
+      }
+
+      ebv_add_data(
+        filepath_nc = nc,
+        data        = tif_in,
+        scenario    = s_no,
+        metric      = metric_no,
+        entity      = e_no,
+        timestep    = t_no,
+        band        = 1,
+        ignore_RAM  = FALSE,
+        raw         = FALSE,
+        verbose     = FALSE
+      )
+
+      gc(verbose = FALSE)
+      cat("  ✔ inserted entity", e_no, "\n")
+    }
+  }
+}
+
+# Check time
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+
+cat("\n🎉 DONE. All binary entities inserted into:\n", nc, "\n")
+```
+
+## 9. Validation and visualization
+
+A quick check that the cube is readable and that the entities and time steps line up.
+
+```{r}
+ebv_analyse(nc, entity = 1, timestep = 1, scenario = 1, metric = 1)
+
+props <- ebv_properties(nc, scenario = 1, metric = 1)
+props@ebv_cube$type
+props@general$entity_names
+
+# Define data cube paths
+datacubes <- ebv_datacubepaths(nc, verbose = FALSE)
+
+# Simple plot
+ebv_map(filepath = nc, datacubepath = datacubes[1, 1], entity = 1,
+        timestep = 1, classes = 2, verbose = FALSE)
+```
+
+# 10. Clean up temporary binary rasters
+
+With everything inserted, the temporary binary folder can be removed to free disk space.
+
+```{r}
+bin_root <- file.path(local_tmp, "bin")
+cat("Removing temporary binary raster folder:", bin_root, "\n")
+unlink(bin_root, recursive = TRUE)
+
+if (!dir.exists(bin_root)) {
+  cat("✔ Temporary binary folder successfully removed.\n")
+} else {
+  warning("Binary folder could not be removed: ", bin_root)
+}
+```

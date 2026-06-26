@@ -1,95 +1,44 @@
 ---
-title: "GLOBIO Downsacaling process - EBV Dataset"
-author: "Andres Camilo Marmol Guijarro, Emmanuel Oceguera-Conchas"
-date: 2026-02-11
-output: html_documen
-editor_options: 
-  markdown: 
-    wrap: 72
+title: "GLOBIO Land-Use - Aggregation to 0.5° and EBV Cube generation"
+author: "Emmanuel Oceguera-Conchas, Andres Marmol Guijarro"
+date: 11-02-2026
+output: html_document
 ---
 
 ## 1. Introduction
 
-This workflow processes GLOBIO land-use rasters and converts them into
-an EBV Cube NetCDF file. In contrast to the high-resolution binary
-workflow, this notebook focuses on aggregating preprocessed land-use
-layers to a coarser spatial resolution of 0.5° and storing the resulting
-proportional cover values in an EBV-compliant data cube.\
-\
-The workflow comprises two core steps:\
-\
-1. *Aggregate the original raster data to 0.5°*\
-The original GLOBIO land-use rasters have a spatial resolution of
-approximately 0.002777° (about 300 m at the equator). In this step, they
-are aggregated to a coarser resolution of 0.5°.\
-\
-2. *Build and populate the EBV Cube NetCDF file\
-*Once the aggregated rasters have been created, they are inserted into
-an EBV Cube NetCDF file that follows the standard EBV data structure and
-can be prepared for publication in the EBV Portal.\
-\
-The aggregation is performed separately for each land-use class. This
-approach calculates the proportional cover of each class within every
-0.5° grid cell. As a result, the outputs are no longer simple
-categorical maps, but continuous layers describing the land-use
-composition of each coarse grid cell.\
-\
-The final NetCDF file follows the standard EBV Cube structure and is
-organized by scenario, metric, time step, and entity. In this dataset,
-the entities correspond to the different harmonized land-use classes.
+This workflow processes GLOBIO land-use data and converts it into an EBV Cube NetCDF file.
 
-### 1.1 Overview of the workflow
+Unlike the high-resolution binary workflow, it aggregates the preprocessed layers from 0.002777° (approx. 300 m at the equator) to a coarser resolution of 0.5°, storing each class's proportional cover per grid cell.
 
-This notebook follows four core processing stages:
+The workflow comprises two core steps:
 
-1.  *Prepare the working environment* Load the required R packages,
-    define temporary raster storage, and set the main input and output
-    paths.
+-   *Aggregation to 0.5°:* The preprocessed GLOBIO rasters (≈0.002777°, about 300 m) are aggregated to 0.5°. Aggregation runs per land-use class, computing each class's proportional cover within every 0.5° cell — so the outputs are continuous composition layers, not categorical maps.
 
-2.  *Aggregate the original GLOBIO rasters to 0.5°*\
-    Process the high-resolution rasters for all selected scenarios and
-    years and write the aggregated outputs to disk.
+-   *EBV Cube generation:* The aggregated rasters are inserted into an EBV Cube NetCDF file, organized by scenario, metric, time step, and entity (the harmonized land-use class), ready for publication on the EBV Portal.
 
-3.  *Create the EBV Cube NetCDF file*\
-    Define the spatial, temporal, and thematic structure of the EBV
-    Cube, including resolution, time steps, entities, and technical
-    settings, and initialize the empty NetCDF file.
+In the notebook, these steps span four sections: preparing the working environment (loading `terra`, `ebvcube`, `stringr`, `dplyr` and setting paths), aggregating the rasters, building the EBV Cube structure, and populating it.
 
-4.  *Populate the EBV Cube NetCDF file* Insert the aggregated rasters
-    into the correct position in the EBV Cube according to scenario,
-    entity, and time step.
+### 1.1 GLOBIO scenarios and time steps
 
-### 1.2 GLOBIO scenarios and time steps
+The workflow processes four GLOBIO scenarios across four years each. The 2020 historical year is shared across all scenarios, so differences in projections reflect only future changes.
 
-The workflow processes GLOBIO land-use data for four key scenarios and
-four selected years. The historical year 2020 is used as a common
-reference point so that differences among future projections reflect
-scenario assumptions rather than different starting conditions.
+| Scenario           | Abbreviation | Available Years        |
+|--------------------|--------------|------------------------|
+| SSP2-Baseline      | Baseline     | 2020, 2030, 2050, 2070 |
+| Nature as Culture  | NaC          | 2020, 2030, 2050, 2070 |
+| Nature for Society | NfS          | 2020, 2030, 2050, 2070 |
+| Nature for Nature  | NfN          | 2020, 2030, 2050, 2070 |
 
-|                        |                  |                        |
-|------------------------|------------------|------------------------|
-| **Scenario**           | **Abbreviation** | **Available Years**    |
-| **SSP2-Baseline**      | Baseline         | 2020, 2030, 2050, 2070 |
-| **Nature as Culture**  | NaC              | 2020, 2030, 2050, 2070 |
-| **Nature for Society** | NfS              | 2020, 2030, 2050, 2070 |
-| **Nature for Nature**  | NfN              | 2020, 2030, 2050, 2070 |
+### 1.2 Before you start
 
-### 1.3 Before you start
+Make sure the following are in place:
 
-To ensure the workflow runs smoothly, the following conditions should be
-met:
-
--   The original GLOBIO raster files are available in the expected
-    folder structure.
--   The `metadata.json` file for the EBV dataset already exists.
--   The `GLOBIO_categories.csv` file is available and contains the
-    land-use class names.
--   Sufficient temporary disk space is available for raster processing.
--   The `ebvcube` package is installed and working correctly.
-
-This workflow assumes that the processed 0.5° rasters will be used to
-create a valid EBV Cube NetCDF file compatible with the EBV Portal
-structure.
+-   The preprocessed GLOBIO binary rasters, in the expected folder structure
+-   `GLOBIO_categories.csv`, mapping original GLOBIO classes to broad classes
+-   The dataset's `metadata.json` file (Obtain from the [EBV Data Portal](https://portal.geobon.org/datasets))
+-   Enough temporary disk space for raster processing
+-   A working `ebvcube` install, plus `terra`, `stringr`, and `dplyr`
 
 ```{r}
 # note: Set cache = FALSE when re-running after changes to input data or paths
@@ -99,13 +48,7 @@ knitr::opts_chunk$set(cache = TRUE)
 
 ## 2. Load libraries
 
-In this section, we load the R packages required for raster processing
-and EBV Cube creation.
-
--   `terra` is used for reading, aggregating, and writing raster data.
--   `ebvcube` is used to create and populate the EBV Cube NetCDF file.
--   `stringr` and `dplyr` are used for string handling and basic data
-    preparation.
+Here we load the packages used throughout the workflow: `terra` for raster processing (reading, aggregating, writing), `ebvcube` for creating and filling the EBV Cube NetCDF file, and `stringr` and `dplyr` for string handling and data preparation.
 
 ### 2.1 Clean environment and load libraries
 
@@ -130,9 +73,7 @@ library(dplyr)
 
 ## 3. Configure temporary raster storage
 
-R aster aggregation can create large temporary files. For this reason,
-it is recommended to define a temporary folder on a drive with
-sufficient free storage space.
+Aggregation can write a lot of temporary data to disk, so point `terra` at a drive with enough free space.
 
 ```{r}
 
@@ -150,11 +91,7 @@ cat("Local temporary folder: ", local_temp)
 
 ## 4. Define input and output paths
 
-Here we define:
-
--   the folder containing the input rasters
-
--   the folder where the aggregated 0.5° rasters will be stored
+Input: the folder of preprocessed binary rasters. Output: the folder for the aggregated 0.5° rasters.
 
 ```{r}
 
@@ -168,8 +105,7 @@ cat("Output root:", out_root, "\n")
 
 ## 5. Define the main workflow settings
 
-In this step, we define the dataset ID, scenarios, and years to be
-processed.
+Set the dataset ID, scenarios, years, and aggregation settings.
 
 ```{r}
 
@@ -177,19 +113,18 @@ id <- 103
 years  <- c(2020, 2030, 2050, 2070)
 scenarios <- c("NfN", "NaC", "NfS", "Baseline")
 
+# Aggregation settings
+target_deg <- 0.5   # target resolution in degrees
+nodata_val <- -1   # NoData value used during aggregation
+
 cat("ID:", id, "\n")
 cat("Years:", paste(years, collapse = ", "), "\n")
 cat("Scenarios:", paste(scenarios, collapse = ", "), "\n")
 ```
 
-## 6. Load the land-use classes table
+## 6. Load the reclassification table
 
-In this step, we load the lookup table used to map broader land-use
-classes applied in this workflow.
-
-This table defines how the original GLOBIO land-use classes are mapped
-to the broader harmonized classes used in the subsequent EBV Cube
-creation steps.
+Load the lookup table that maps original GLOBIO land-use values to the broad harmonized classes used in the subsequent steps.
 
 ```{r}
 
@@ -202,37 +137,11 @@ cat("Broad classes:\n", paste(unique(globio_lut$broader_category), collapse = ",
 head(globio_lut)
 ```
 
-## 7. Aggregation to 0.5° resolution
+## 7. Aggregation to 0.5° resolution {#sec-7.-aggregation-to-0.5°-resolution-}
 
-In this section, the high-resolution GLOBIO rasters are aggregated to
-0.5° resolution. Each output raster represents the proportional cover of
-a single land-use class within each coarse grid cell.
+Aggregate the high-resolution rasters to 0.5°. Each output cell holds the proportional cover of one land-use class within that coarse grid cell. Baseline uses its own input for every year; NfN, NaC, and NfS use the shared Historical 2020 raster for 2020 and their own rasters for 2030, 2050, and 2070.
 
-Processing logic:
-
--   *Baseline:* aggregate all available years (2020, 2030, 2050, 2070)
-    using the corresponding Baseline input rasters.
-
--   *NaC, NfN, and NfS:* use the shared Historical 2020 rasters for the
-    year 2020, and the scenario-specific rasters for 2030, 2050, and
-
-    2070. 
-
-This ensures that all non-Baseline scenarios share the same historical
-reference year, while future projections remain scenario-specific.
-
-### 7.1 Process scenario-specific rasters
-
-In this step, the GLOBIO rasters are aggregated by scenario and year.
-For the Baseline scenario, each year is processed using its
-corresponding input raster. For the NaC, NfN, and NfS scenarios, the
-shared Historical 2020 raster is used for the year 2020, while the
-future years 2030, 2050, and 2070 use the scenario-specific raster
-inputs.
-
-This ensures that all non-Baseline scenarios start from the same
-historical reference year, while future projections remain
-scenario-specific.
+### 7.1 Aggregate scenario rasters
 
 ```{r}
 
@@ -300,16 +209,9 @@ for (sc in scenarios){
 }
 ```
 
-### 7.1 Proccess historical 2020
+### 7.2 Aggregate historical 2020
 
-In this step, the historical 2020 rasters are aggregated separately
-because they provide the shared reference year for the *Nature for
-Nature* (NfN), *Nature as Culture* (NaC), and *Nature for Society* (NfS)
-scenarios.
-
-Using a common 2020 baseline ensures that differences among these
-scenarios in later years reflect the scenario assumptions rather than
-different initial conditions.
+The 2020 raster is aggregated separately because NfN, NaC, and NfS all share it as their reference year, so differences between these scenarios in later years reflect only scenario assumptions. Baseline uses its own 2020 raster instead, matching its business-as-usual trajectory.
 
 ```{r}
 
@@ -361,18 +263,7 @@ for (tif in tifs_hist) {
 
 ### 8.1 Check paths and available binary rasters
 
-Before creating the EBV Cube NetCDF file, we define the main input and
-output paths for this step, including the metadata JSON file and the
-location where the final NetCDF file will be written.
-
-In addition, we check that the binary rasters created in the previous
-step are available in the expected folder structure. These rasters
-provide the binary entity layers that will later be inserted into the
-EBV Cube.
-
-Verifying their availability at this stage helps ensure that the NetCDF
-creation step is based on the correct input files and that the workflow
-can continue without missing-data errors.
+Define the input/output paths for this step — the metadata JSON and the target NetCDF file — and confirm the aggregated rasters from [Section 7](#sec-7.-aggregation-to-0.5°-resolution-) are present in the expected folders. This check catches missing inputs before the cube is built.s.
 
 ```{r}
 
@@ -406,14 +297,7 @@ cat("Total binary GeoTIFF files found:", length(tif_files), "\n")
 
 ### 8.2 Define EBV Cube structure
 
-Before creating the NetCDF file, we first define its *core spatial*,
-*temporal*, and *thematic components*. These include the list of
-entities, the spatial extent and resolution, the coordinate reference
-system (CRS), the time steps, and the fill value and data precision to
-be used in the file.
-
-In this dataset, the entities correspond to the harmonized broad
-land-use classes derived from the original GLOBIO categories.
+Define the cube's spatial, temporal, and thematic components: entities, extent and resolution, CRS, time steps, fill value, and data precision. Entities here are the harmonized broad land-use classes.
 
 ```{r}
 
@@ -441,61 +325,40 @@ cat("Spatio-temporal settings\n")
 cat("=======================\n")
 list(timesteps = years, extent = ext, res = res, epsg = epsg)
 
-# NoData handling 
-nodata_val <- 255
-
 # Fill value and datatype
-fillvalue <- 255
+fillvalue <- nodata_val
 prec <- 'float'
 ```
 
 ### 8.2 Create empty NetCDF file
 
-After defining the main properties of the EBV Cube, an empty NetCDF file
-is created. This file establishes the dataset’s structure, including its
-spatial extent, resolution, coordinate reference system, time steps,
-entities, and technical settings such as fill value and data precision.
+After defining the main properties of the EBV Cube, an empty NetCDF file is created. This file establishes the dataset’s structure, including its spatial extent, resolution, coordinate reference system, time steps, entities, and technical settings such as fill value and data precision.
 
 ```{r}
 cat("Creating EBV Cube NetCDF\n")
 cat("=======================\n")
 
 ebv_create(
-  jsonpath = js,
+  jsonpath   = js,
   outputpath = nc,
-  entities = entities,
-  epsg = epsg,
-  extent = extent,
-  resolution = res_xy,
-  timesteps = as.character(years),
-  fillvalue = nodata_val,
-  prec = prec,
-  force_4D = TRUE,
-  overwrite = TRUE,
-  verbose = TRUE
+  entities   = entities,
+  epsg       = epsg,
+  extent     = ext,
+  resolution = res,
+  timesteps  = as.character(years),
+  fillvalue  = fillvalue,
+  prec       = prec,
+  force_4D   = TRUE,
+  overwrite  = TRUE,
+  verbose    = TRUE
 )
 ```
 
-At this stage, the file contains the EBV cube structure but not the
-binary raster data, which will be added in the next step.
+At this stage, the file contains the EBV cube structure but not the data, which will be incorporate in the next step.
 
 ## 9. Populate the EBV Cube
 
-Once the empty EBV NetCDF file has been created, the aggregated rasters
-are inserted into the EBV Cube one by one.
-
-For each scenario and time step, the workflow selects the correct folder
-of aggregated entity rasters:
-
--   *Baseline 2020* uses the `Baseline/2020` folder
-
--   *all other scenarios in 2020* use the shared `Historical/2020`\
-    folder
-
--   *future years* use the scenario-specific folders
-
-Each `entity_XX_p05.tif` file is then inserted into the correct position
-in the EBV Cube.
+Insert the aggregated rasters into the cube one by one. For each scenario and time step, the workflow picks the matching folder — in 2020, Baseline uses `Baseline/2020` while NfN, NaC, and NfS use the shared `Historical/2020`; later years use each scenario's own folder — and places every `entity_XX_p05.tif` at its correct scenario / time step / entity position..
 
 ```{r}
 # Get the properties and entities
@@ -571,4 +434,38 @@ time.taken <- end.time - start.time
 time.taken
 
 cat("\n🎉 DONE. All binary entities inserted into:\n", nc, "\n")
+```
+
+## 11. Validation and visualization
+
+A quick check that the cube is readable and that the entities and time steps line up.
+
+```{r}
+ebv_analyse(nc, entity = 1, timestep = 1, scenario = 1, metric = 1)
+
+props <- ebv_properties(nc, scenario = 1, metric = 1)
+props@ebv_cube$type
+props@general$entity_names
+
+# Define data cube paths
+datacubes <- ebv_datacubepaths(nc, verbose = FALSE)
+
+# Simple plot
+ebv_map(filepath = nc, datacubepath = datacubes[1, 1], entity = 1,
+        timestep = 1, verbose = FALSE)
+```
+
+## 12. Clean up temporary aggregated rasters
+
+With everything inserted, the temporary aggregated folder can be removed to free disk space.
+
+```{r}
+cat("Removing temporary aggregated raster folder:", out_root, "\n")
+unlink(out_root, recursive = TRUE)
+
+if (!dir.exists(out_root)) {
+  cat("✔ Temporary aggregated folder successfully removed.\n")
+} else {
+  warning("Aggregated folder could not be removed: ", out_root)
+}
 ```

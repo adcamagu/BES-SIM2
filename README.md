@@ -107,8 +107,8 @@ In addition, two coarser versions of LandSyMM-PLUM and GLOBIO are provided.
 
 | ID | Title | DOI | Resolution | File |
 |---------------|---------------|---------------|---------------|---------------|
-| 102 | Upscaled Land Use projections (BES-SIM 2 GLOBIO) | TBD | 0.5 degrees | alexander_ecostr_id102_20260309.nc |
-| 103 | Upscaled 0.5 Land Use projections (BES-SIM 2 LandSymm-PLUM) | TBD | 0.5 degrees | alkemade_ecostr_id103_20260216.nc |
+| 102 | Upscaled Land Use projections (BES-SIM 2 LandSymm-PLUM) | TBD | 0.5 degrees | alexander_ecostr_id102_20260309.nc |
+| 103 | Upscaled 0.5 Land Use projections (BES-SIM 2 GLOBIO) | TBD | 0.5 degrees | alkemade_ecostr_id103_20260216.nc |
 
 The other datasets are listed below
 
@@ -143,7 +143,7 @@ Two different datasets of climate are suggested to be used in BES-SIM 2.
 1.  **ISIMIP3B datasets derived from the ISPL-CM6A-LR.** The datasets include mean (tas), minimum (tasmin) and maximum (tasmax) air surface temperature, precipitation (pr), near surface relative humidity (hurs), near surface specific humidity (huss), etc. All datasets are found as NetCDFs, spanning from 2015-2100 and at a 0.5 degree resolution. The following table summarises climate data for the Shared Socioeconomic Pathways to be tested in BES-SIM 2 and their links to ISIMIP3b repository.
 
     | SSP-RCP | Link |
-    |------------------|------------------------------------------------------|
+    |-------------------|-----------------------------------------------------|
     | SSP1-RCP2.6 | <https://data.isimip.org/search/tree/ISIMIP3b/InputData/climate/atmosphere/ipsl-cm6a-lr/ssp126/> |
     | SSP2-RCP4.5 | <https://data.isimip.org/search/tree/ISIMIP3b/SecondaryInputData/climate/atmosphere/ipsl-cm6a-lr/ssp245/> |
     | SSP4-RCP6.0 | <https://data.isimip.org/search/tree/ISIMIP3b/SecondaryInputData/climate/atmosphere/ipsl-cm6a-lr/ssp460/> |
@@ -153,7 +153,7 @@ Two different datasets of climate are suggested to be used in BES-SIM 2.
 2.  **WorldClim datasets derived from ISPL-CM6A-LR.** Worldclim datasets variables available are monthly average minimum temperature (°C) (tn), monthly average maximum temperature (°C) (tx), monthly total precipitation (mm) (pr), and bioclimatic variables (bc), for the periods 2021-2040, 2041-2060, 2061-2080 and 2081-2100 for SSP1-RCP2.6 and SSP2-RCP4.5 that will be used in BES-SIM 2. Datasets are available at different resolutions and they are summarised in the folllowing table.
 
     | Spatial Resolution | Links |
-    |----------------------|--------------------------------------------------|
+    |-----------------------|-------------------------------------------------|
     | 30 seconds | <https://www.worldclim.org/data/cmip6/cmip6_clim30s.html> |
     | 2.5 minutes | <https://www.worldclim.org/data/cmip6/cmip6_clim2.5m.html> |
     | 5 minutes | <https://www.worldclim.org/data/cmip6/cmip6_clim5m.html> |

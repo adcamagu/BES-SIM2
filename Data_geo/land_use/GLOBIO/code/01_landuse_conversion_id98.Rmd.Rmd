@@ -1,99 +1,51 @@
 ---
-title: "GLOBIO Land-Use Reclassification and EBV Cube Generation Workflow"
-author: "Emmanuel Oceguera Conchas"
+title: "GLOBIO Land-Use - Reclassification and EBV Cube generation"
+author: "Emmanuel Oceguera-Conchas, Andres Marmol Guijarro"
 date: 23-02-2026
 output: html_document
-editor_options: 
-  markdown: 
-    wrap: 72
 ---
 
 ## 1. Introduction
 
-This workflow processes high-resolution GLOBIO land-use data and
-converts it into an EBV Cube NetCDF file.
+This workflow processes high-resolution GLOBIO land-use data and converts it into an EBV Cube NetCDF file.
 
-The original GLOBIO data is at a resolution of 0.002777° (approx. 300 m)
-and contains numerous specific land-use categories. For compatibility
-with the EBV Cube structure, these are first grouped into a smaller set
-of harmonized broad land-use classes.
+The GLOBIO data come at a resolution of 0.002777° (approx. 300 m at the equator) and contain numerous detailed land-use categories. For compatibility with the EBV Cube structure, these are first grouped into a smaller set of harmonized broad land-use classes.
 
 The workflow comprises three core steps:
 
-1.  *Reclassification:* Original GLOBIO classes are mapped to harmonized
-    broad land-use classes using a lookup table.
+-   *Reclassification:* Original GLOBIO classes are mapped to harmonized broad land-use classes using a lookup table.
 
-2.  *Binarization:* Each broad land-use class is converted into a binary
-    raster (1 for presence, 0 for absence).
+-   *Binarization:* Each broad land-use class is converted into a binary raster (1 for presence, 0 for absence).
 
-3.  *EBV Cube NetCDF file generation:* The binary rasters are structured
-    into an EBV Cube, organizing the data by scenario, metric, time
-    step, and entity (the broad land-use class).
+-   *EBV Cube NetCDF file generation:* The binary rasters are structured into an EBV Cube, organizing the data by scenario, metric, time step, and entity (the broad land-use class).
 
-This high-resolution product is the foundation for a subsequent workflow
-that aggregates the binary rasters to a 0.5° resolution.
+In the notebook, these steps span five sections: preparing the working environment (loading `terra`, `ebvcube`, `tidyverse`, `future.apply` and setting paths), reclassifying the rasters, creating the binary entity rasters, building the EBV Cube structure, and populating it. The result is a high-resolution product that a subsequent workflow aggregates to 0.5° resolution.
 
-### 1.1 Overview of the workflow
+### 1.1 GLOBIO scenarios and time steps
 
-This notebook follows five core processing stages:
+The workflow processes four GLOBIO scenarios across four years each. The 2020 historical year is shared across all scenarios, so differences in projections reflect only future changes.
 
-1.  *Prepare the working environment:* Load necessary R packages
-    (`terra`, `ebvcube`, `tidyverse, future.apply`), define temporary
-    storage, and set input/output paths.
+|                    |                  |                        |
+|--------------------|------------------|------------------------|
+| **Scenario**       | **Abbreviation** | **Available Years**    |
+| SSP2-Baseline      | Baseline         | 2020, 2030, 2050, 2070 |
+| Nature as Culture  | NaC              | 2020, 2030, 2050, 2070 |
+| Nature for Society | NfS              | 2020, 2030, 2050, 2070 |
+| Nature for Nature  | NfN              | 2020, 2030, 2050, 2070 |
 
-2.  *Reclassify GLOBIO rasters*: Convert the original land-use
-    categories into harmonized, broader classes.
+### 1.2 Before you start
 
-3.  *Create binary entity rasters*: Generate a separate binary raster
-    for each broad land-use class, scenario, and year.
+Make sure the following are in place:
 
-4.  *Build the EBV Cube NetCDF file*: Define the structure of the EBV
-    Cube, including the spatial extent, metric, time steps, and
-    entities, and initialize the file.
+-   The GLOBIO ZIP archives and raster files, in the expected folder structure
+-   `GLOBIO_categories.csv`, mapping original GLOBIO classes to broad classes
+-   The dataset's `metadata.json` file (Obtain from the [EBV Data Portal](https://portal.geobon.org/datasets))
+-   Enough temporary disk space for raster processing
+-   A working `ebvcube` install, plus `terra`, `tidyverse`, and optionally `future.apply`
 
-5.  *Populate the EBV Cube NetCDF file:* Insert processed raster data
-    into the correct positions within the NetCDF file, corresponding to
-    the specific scenario, entity, and time step.
+**Note**
 
-### 1.2 GLOBIO scenarios and time steps
-
-The workflow processes GLOBIO land-use data for four key scenarios and
-four specific years. The historical year 2020 is consistently used
-across all scenarios to ensure that differences in projections reflect
-only future changes.
-
-|                        |                  |                        |
-|------------------------|------------------|------------------------|
-| **Scenario**           | **Abbreviation** | **Available Years**    |
-| **SSP2-Baseline**      | Baseline         | 2020, 2030, 2050, 2070 |
-| **Nature as Culture**  | NaC              | 2020, 2030, 2050, 2070 |
-| **Nature for Society** | NfS              | 2020, 2030, 2050, 2070 |
-| **Nature for Nature**  | NfN              | 2020, 2030, 2050, 2070 |
-
-### 1.3 Before you start
-
-To ensure the workflow runs smoothly, the following conditions must be
-met:
-
--   The original GLOBIO ZIP archives and raster files are available in
-    the expected folder structure
--   The reclassification table (`GLOBIO_categories.csv`) is available
-    and contains the mapping from original GLOBIO land-use classes to
-    harmonized broad classes
--   The `metadata.json` file for the EBV Cube dataset already exists
--   Sufficient temporary disk space is available for raster processing.
--   The `ebvcube` package is installed and working correctly
--   The required R packages, especially `terra`, `tidyverse`, and
-    optionally `future.apply`, are installed
-
-Before running the notebook, one additional decision is required:
-Sections 9.2 and 9.3 provide two alternative binarization strategies —
-sequential and parallel — and are mutually exclusive.
-
-By default, Section 9.2 is set to `eval = FALSE` and the parallel
-version in Section 9.3 will run. If you prefer sequential processing
-(e.g. on a machine with limited CPU resources), set Section 9.2 to
-`eval = TRUE` and Section 9.3 to `eval = FALSE` before knitting.
+One decision before knitting: binarization can run sequentially ([Section 9.2](#sec-9.2-binarize-rasters-without-parallel-processing)) or in parallel ([Section 9.3](#sec-9.3-binarize-rasters-with-parallel-processing)) - these are mutually exclusive. Parallel runs by default. For sequentially, set 9.2 to `eval = TRUE` and 9.3 to `eval = FALSE`.
 
 ```{r}
 # note: Set cache = FALSE when re-running after changes to input data or paths
@@ -102,27 +54,15 @@ knitr::opts_chunk$set(cache = TRUE)
 
 ## 2. Load libraries
 
-In this section, we load the R packages required for raster processing,
-data handling, and EBV Cube creation.
-
--   `terra` is used for reading, reclassifying, binarizing, and writing
-    raster data
-
--   `ebvcube` is used to create and fill the EBV Cube NetCDF file
-
--   `tidyverse` is used for handling lookup tables, inspecting tabular
-    data, and supporting data preparation steps
-
--   `future.apply` is used later in the workflow for optional parallel
-    processing during binarization
+Here we load the packages used throughout the workflow: `terra` for raster processing (reading, reclassifying, binarizing, writing), `ebvcube` for creating and filling the EBV Cube NetCDF file, `tidyverse` for handling lookup tables and data preparation, and `future.apply` for optional parallel binarization later on.
 
 ### 2.1 Clean environment and load libraries
 
 If required, install the missing packages before running the workflow.
 
 ```{r}
-# Clean user-defined objects, not knitr internals
-rm(list = setdiff(ls(), c("knitr", "params")))
+# Clean environment
+rm(list = ls())
 gc()
 
 # install.packages("terra")
@@ -138,10 +78,7 @@ library(future.apply)
 
 ## 3. Configure temporary raster storage
 
-Processing large raster files during reclassification and binarization
-can generate substantial temporary data on disk. For this reason, it is
-recommended to define a temporary folder on a drive with sufficient free
-storage space.
+Reclassification and binarization can write a lot of temporary data to disk, so point `terra` at a drive with enough free space.
 
 ```{r}
 
@@ -159,10 +96,8 @@ cat("Local temporary folder: ", local_temp)
 
 ## 4. Define input and output paths
 
-Here we define:
-
--   the folder containing the original ZIP archives with GLOBIO rasters
--   the output folder for the reclassified broad-class rasters
+Input: the folder of GLOBIO ZIP archives.\
+Output: the folder for reclassified broad-class rasters.
 
 ```{r}
 
@@ -178,8 +113,7 @@ cat("Output root:", output_root, "\n")
 
 ## 5. Define the main workflow settings
 
-In this step, we define the dataset ID, scenarios, and years to be
-processed.
+Set the dataset ID, scenarios, and years to process.
 
 ```{r}
 
@@ -195,13 +129,7 @@ cat("Scenarios:", paste(scenarios, collapse = ", "), "\n")
 
 ## 6. Load the reclassification table
 
-In this step, we load the lookup table used to map the original GLOBIO
-land-use category values to the broader land-use classes applied in this
-workflow.
-
-This table defines how the original GLOBIO land-use classes are mapped
-to the broader harmonized classes used in the subsequent binarization
-and EBV Cube creation steps.
+Load the lookup table that maps original GLOBIO land-use values to the broad harmonized classes used in binarization and EBV Cube creation.
 
 ```{r}
 
@@ -216,9 +144,7 @@ head(globio_lut)
 
 ### 6.1 Build a reclassification matrix
 
-`terra::classify()` expects a two-column matrix in which the first
-column contains the original values and the second column contains the
-new reclassified values.
+`terra::classify()` expects a two-column matrix: original values in the first column, new values in the second.
 
 ```{r}
 rcl <- as.matrix(globio_lut[, c("values", "broad_id")])
@@ -227,20 +153,7 @@ head(rcl)
 
 ## 7. Identify the ZIP files to process
 
-The original GLOBIO data are stored in ZIP archives. In this step, we
-list all ZIP files and keep only those needed for this workflow.
-
-The filtering logic does two things:
-
--   it excludes the historical ZIP archive, because that file is handled
-    separately later
-
--   it keeps only the ZIP files corresponding to the selected scenarios,
-    using the version identifier `1.9` that appears in the filenames of
-    the BES-SIM2 scenario archives (e.g.
-    `GLOBIO4_landuse_10sec_2050_NfN_v1.9.zip`), and a separate match for
-    the `Baseline.zip` archive which follows a different naming
-    convention
+List all ZIP archives and keep only the ones needed. The filter excludes the historical archive (handled separately in [Section 8.2](#sec-8.2-reclassify-historical-2020-raster)) and keeps only the selected scenarios - matching the `1.9` version tag in the BES-SIM2 filenames (e.g. `GLOBIO4_landuse_10sec_2050_NfN_v1.9.zip`) plus the differently-named `Baseline.zip`.
 
 ```{r}
 zip_files <- list.files(
@@ -261,40 +174,18 @@ head(zip_files, 10)
 
 ## 8. Reclassification
 
-This step converts the original GLOBIO land-use category values into the
-broader land-use classes defined for this workflow.
-
-The reclassification is based on a lookup table that links each original
-GLOBIO value to a corresponding broad-class ID. As a result, the output
-raster no longer stores the original detailed category values, but the
-harmonized class IDs used in the subsequent steps.
+Convert the original GLOBIO land-use category values into broad land-use class IDs via the lookup table. The output store harmonized class IDs instead of the original detailed categories. This exercise is for harmonization purpose.
 
 ### 8.1 Reclassify scenario rasters
 
-For each ZIP archive, the workflow:
+For each ZIP archive: extract it, find the `.tif` files, parse scenario and year from the path, keep only the selected years, reclassify, and write to disk.
 
--   extracts the files into a temporary directory
+Output settings\
+-data type `INT1S`\
+-NoData `-1`\
+-compression `DEFLATE`
 
--   searches for all `.tif` files contained in the archive
-
--   identifies the scenario and year from the file path or filename
-
--   keeps only the selected years
-
--   applies the reclassification table to the raster values
-
--   writes the reclassified raster to disk
-
-The output rasters are written with the following settings:
-
--   data type: `INT1S`
-
--   NoData value: `-1`
-
--   compression: `DEFLATE`
-
-This keeps file sizes manageable and ensures consistent NoData handling
-in the subsequent binarization step.
+keep file sizes down and NoData handling consistent for binarization.
 
 ```{r}
 
@@ -380,14 +271,9 @@ cat("\nTotal processing time:", total_time, "\n")
 
 ```
 
-### 8.2 Reclassify historical 2020 raster
+### 8.2 Reclassify historical 2020 raster {#sec-8.2-reclassify-historical-2020-raster}
 
-The historical 2020 layer is processed separately because it is stored
-in its own ZIP archive and serves as the shared baseline for the future
-scenarios.
-
-This step ensures that all scenarios can later use the same 2020
-reference.
+The 2020 layer lives in its own ZIP and serves as the shared baseline for all future scenarios, so it is processed separately.
 
 ```{r}
 
@@ -445,15 +331,7 @@ rm(r_hist, r2_hist)
 
 ## 9. Binarization
 
-After reclassification, each raster cell stores the ID of a broad
-land-use class. To prepare these data for the EBV cube NetCDF file, each
-broad class is converted into a separate binary raster, where cells
-belonging to that class are assigned `1` and all other cells are
-assigned `0`.
-
-In this dataset, each harmonized broad land-use class is treated as one
-EBV entity, and each binary raster therefore represents a single entity
-layer in the final cube.
+Each reclassified cell now holds a harmonized broad land-use class ID. For the EBV Cube, each broad class is split into its own binary raster: `1` where the class is present, `0` elsewhere. Each broad class is one EBV entity, so each binary raster is one entity layer in the final cube.
 
 ### 9.1 Define paths for binarization
 
@@ -476,15 +354,9 @@ BASE_DIR <- file.path(tif_root, "Baseline")
 
 ```
 
-### 9.2 Binarize rasters without parallel processing
+### 9.2 Binarize rasters without parallel processing {#sec-9.2-binarize-rasters-without-parallel-processing}
 
-This step creates one binary raster per broad land-use class for each
-scenario and year. For every input raster, the workflow selects the
-corresponding reclassified file, creates a binary layer for each class,
-and writes the outputs to disk as `entity_XX.tif`.
-
-For non-Baseline scenarios, the year 2020 is not processed here because
-the shared historical baseline is handled separately.
+One binary raster per broad class, for each scenario and year. For each input raster, the workflow builds one binary layer per class and writes them as `entity_XX.tif`. For non-Baseline scenarios, 2020 is skipped here — the shared baseline is handled in [Section 9.4](#sec-9.4-binarize-historical-2020).
 
 ```{r eval = FALSE}
 for (sc in scenarios) {
@@ -534,16 +406,9 @@ for (sc in scenarios) {
 
 ```
 
-### 9.3 Binarize rasters with parallel processing
+### 9.3 Binarize rasters with parallel processing {#sec-9.3-binarize-rasters-with-parallel-processing}
 
-For larger datasets, binarization can be accelerated by processing
-different scenario-year combinations in parallel. Each worker reads one
-reclassified raster and creates the full set of binary entity rasters
-for that input.
-
-This can reduce processing time, but it also increases memory use. The
-number of workers should therefore be chosen according to the available
-RAM and CPU resources.
+The same operation, but processing scenario-year combinations in parallel. Each worker reads one raster and writes its full set of entity rasters. This is faster but uses more memory, so set the number of workers to match your available RAM and CPU.
 
 ```{r}
 
@@ -612,17 +477,9 @@ future_lapply(seq_len(nrow(jobs)), function(k) {
 })
 ```
 
-### 9.4 Binarize historical 2020
+### 9.4 Binarize historical 2020 {#sec-9.4-binarize-historical-2020}
 
-The historical 2020 raster is processed separately because it serves as
-the shared starting point for the Nature for Nature (NfN), Nature as
-Culture (NaC), and Nature for Society (NfS) scenario projections.
-
-This common starting state ensures a fair comparison of differences
-arising only from scenario assumptions. Conversely, the
-"business-as-usual" Baseline scenario uses its own distinct 2020 raster,
-tailored to its continuation trajectory. This methodological separation
-maintains the integrity and comparability of the four modeled outcomes.
+The 2020 raster is processed separately because NfN, NaC, and NfS all share it as their starting point — a common 2020 state so that differences between them reflect only scenario assumptions. Baseline uses its own 2020 raster instead, matching its business-as-usual trajectory.
 
 ```{r}
 
@@ -672,18 +529,7 @@ time.taken
 
 ### 10.1 Check paths and available binary rasters
 
-Before creating the EBV Cube NetCDF file, we define the main input and
-output paths for this step, including the metadata JSON file and the
-location where the final NetCDF file will be written.
-
-In addition, we check that the binary rasters created in the previous
-step are available in the expected folder structure. These rasters
-provide the binary entity layers that will later be inserted into the
-EBV Cube.
-
-Verifying their availability at this stage helps ensure that the NetCDF
-creation step is based on the correct input files and that the workflow
-can continue without missing-data errors.
+Define the input/output paths for this step — the metadata JSON and the target NetCDF file — and confirm the binary rasters from Section 9 are present in the expected folders. This check catches missing inputs before the cube is built.
 
 ```{r}
 
@@ -718,14 +564,7 @@ cat("Total binary GeoTIFF files found:", length(tif_files), "\n")
 
 ### 10.2 Define EBV Cube structure
 
-Before creating the NetCDF file, we first define its *core spatial*,
-*temporal*, and *thematic components*. These include the list of
-entities, the spatial extent and resolution, the coordinate reference
-system (CRS), the time steps, and the fill value and data precision to
-be used in the file.
-
-In this dataset, the entities correspond to the harmonized broad
-land-use classes derived from the original GLOBIO categories.
+Define the cube's spatial, temporal, and thematic components: entities, extent and resolution, CRS, time steps, fill value, and data precision. Entities here are the harmonized broad land-use classes.
 
 ```{r}
 
@@ -759,10 +598,7 @@ prec <- "byte"
 
 ### 10.3 Create empty NetCDF file
 
-After defining the main properties of the EBV Cube, an empty NetCDF file
-is created. This file establishes the dataset’s structure, including its
-spatial extent, resolution, coordinate reference system, time steps,
-entities, and technical settings such as fill value and data precision.
+Create the empty NetCDF file from the properties defined above. It holds the cube structure but no raster data yet. that comes in [Section 11](#sec-11.-populate-the-ebv-cube).
 
 ```{r}
 cat("Creating EBV Cube NetCDF\n")
@@ -784,24 +620,11 @@ ebv_create(
 )
 ```
 
-At this stage, the file contains the EBV cube structure but not the
-binary raster data, which will be added in the next step.
+At this stage, the file contains the EBV cube structure but not the data, which will be incorporate in the next step.
 
-## 11. Populate the EBV Cube
+## 11. Populate the EBV Cube {#sec-11.-populate-the-ebv-cube}
 
-***Insert binary rasters into the NetCDF file***
-
-Once the empty EBV NetCDF file has been created, the binary rasters are
-inserted into the EBV Cube one by one.
-
-For each scenario and time step, the workflow selects the corresponding
-folder of binary entity rasters. In 2020, `Baseline` uses its own
-`Baseline/2020` folder, while `NfN`, `NaC`, and `NfS` use the shared
-`Historical/2020` folder. For later years, each scenario uses its own
-folder.
-
-The rasters stored as `entity_XX.tif` are then inserted into the correct
-position in the EBV Cube according to scenario, time step, and entity.
+Insert the binary rasters into the cube one by one. For each scenario and time step, the workflow picks the matching folder — in 2020, Baseline uses `Baseline/2020` while NfN, NaC, and NfS use the shared `Historical/2020`; later years use each scenario's own folder — and places every `entity_XX.tif` at its correct scenario / time step / entity position.
 
 ```{r}
 
@@ -880,11 +703,30 @@ time.taken
 cat("\n🎉 DONE. All binary entities inserted into:\n", nc, "\n")
 ```
 
-## 12. Clean up temporary binary rasters
+## 12. Validation and visualization
 
-Once all binary rasters have been incorporated into the NetCDF file, the
-temporary binary folder is no longer needed and can be removed to free
-disk space.
+A quick check that the cube is readable and that the entities and time steps
+line up.
+
+```{r}
+ebv_analyse(nc, entity = 1, timestep = 1, scenario = 1, metric = 1)
+
+props <- ebv_properties(nc, scenario = 1, metric = 1)
+props@ebv_cube$type
+props@general$entity_names
+
+# Define data cube paths
+datacubes <- ebv_datacubepaths(nc, verbose = FALSE)
+
+# Simple plot
+ebv_map(filepath = nc, datacubepath = datacubes[1, 1], entity = 1,
+        timestep = 1, classes = 2, verbose = FALSE)
+```
+
+
+## 13. Clean up temporary binary rasters
+
+With everything inserted, the temporary binary folder can be removed to free disk space.
 
 ```{r}
 cat("Removing temporary binary raster folder:", out_data_root, "\n")
