@@ -1,27 +1,26 @@
 ---
-title: "PLUM Land-Use – Rasterization to 0.5° and EBV Cube Generation"
-author: "Emmanuel Oceguera-Conchas, Andres Marmol-Guijarro, Magali Weissgerber"
+title: "PLUM Land-Use (Crop Intensity) – Rasterization to 0.5° and EBV Cube Generation"
+author: "Emmanuel Oceguera-Conchas, Andres Marmol Guijarro, Magali Weissgerber"
 date: 2026-02-05
 output: html_document
 ---
 
 ## 1. Introduction
 
-This workflow processes the PLUM 0.5° land-use data and converts it into an EBV Cube NetCDF file (dataset ID 102).
+This workflow processes the PLUM 0.5° crop land-use crop and intensity data and converts it into an EBV Cube NetCDF file (dataset ID 101).
 
-Each PLUM table lists, per 0.5° cell, the area of every land-use class split by protection status (`protected` / `unprotected`). For each class the workflow computes three percentage metrics — protected, unprotected, and total — relative to the cell's combined land area, stacks the years into one raster per class, and stores the result as an EBV Cube.
+Each PLUM table reports seven management variables per 0.5° cell — area, fertiliser intensity and quantity, irrigation intensity and quantity, other-management intensity, and yield — for each crop and farming type (`conventional` / `restricted`). Crop and farming type together form the EBV entity (24 in total); the seven variables are the metrics. The workflow rasterizes each variable per entity, stacks the years into one raster per variable and entity, and stores the result as an EBV Cube. Restricted farming occurs only under the NaC and NfS scenarios, so restricted entities are empty (NA) for the others
 
 The workflow comprises two core steps:
 
--   *Rasterization:* Each class area is divided by the cell's combined land area (all classes, protected + unprotected) and multiplied by 100, giving the protected, unprotected, and total percentage; each metric is written into the 0.5° grid as one stacked GeoTIFF per class (one band per year).
+-   *Rasterization:* Each management variable is rasterized into the 0.5° grid per crop and farming type, and stacked into one GeoTIFF per variable and entity (one band per year).
+-   *EBV Cube NetCDF file generation:* The stacked layers are structured into an EBV Cube, organizing the data by scenario, metric (the seven variables), time step, and entity (crop × farming type).
 
--   *EBV Cube NetCDF file generation:* The stacked layers are structured into an EBV Cube, organizing the data by scenario, metric, time step, and entity (the land-use class).
-
-In the notebook, these steps span four sections: preparing the working environment (loading `terra`, `ebvcube` and setting paths), rasterizing and stacking the metrics, building the EBV Cube structure, and populating it.
+In the notebook, these steps span four sections: preparing the working environment (loading `terra`, `ebvcube` and setting paths), rasterizing and stacking the variables, building the EBV Cube structure, and populating it.
 
 ### 1.1 PLUM scenarios and time steps
 
-The workflow processes five scenarios across four years each. The scenario order follows the metadata JSON.
+The workflow processes five scenarios across four years each. The scenario order follows the metadata JSON. Restricted farming exists only under NaC and NfS; the restricted entities are NA for BAU, NfN, and NfNl.
 
 | Scenario                  | Abbreviation | Available Years        |
 |---------------------------|--------------|------------------------|
@@ -35,13 +34,13 @@ The workflow processes five scenarios across four years each. The scenario order
 
 Make sure the following are in place:
 
--   The PLUM scenario ZIP archives (tabular `.txt.gz` files), in the expected folder structure `SCENARIO/s1/YEAR/LandCover.txt.gz`
+-   The PLUM scenario ZIP archives (tabular `.txt.gz` files), in the expected folder structure `SCENARIO/s1/YEAR/LandUse.txt.gz`
 -   The dataset's `metadata.json` file (Obtain from the [EBV Data Portal](https://portal.geobon.org/datasets))
 -   Enough temporary disk space for raster processing
 -   A working `ebvcube` install, plus `terra`
 
 ```{r}
-knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(cache = TRUE)   
 ```
 
 ## 2. Load libraries
@@ -58,7 +57,7 @@ rm(list = ls())
 gc()
 
 # install.packages("terra")
-# install.packages("ebvcube")
+#install.packages("ebvcube")
 
 library(terra)
 library(ebvcube)
@@ -83,11 +82,11 @@ cat("Local temporary folder: ", local_tmp)
 
 ## 4. Define input and output paths
 
-Input: the folder of PLUM ZIP archives. Output: the folder for the stacked per-class GeoTIFFs, organized by metric and scenario.
+Input: the folder of PLUM ZIP archives. Output: the folder for the stacked per-variable GeoTIFFs, organized by metric and scenario.
 
 ```{r}
 base_dir <- "../BES-SIM 2/PLUM_LU/0.5_degrees"
-out_dir  <- "../BES-SIM 2/PLUM_LU/0.5_degrees/disgregated_rast"
+out_dir  <- "../BES-SIM 2/PLUM_LU/0.5_degrees/landuse_rast"
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 cat("Input root:", base_dir, "\n")
@@ -96,29 +95,45 @@ cat("Output root:", out_dir, "\n")
 
 ## 5. Define the main workflow settings
 
-Set the scenarios, years, metrics, and the land-use classes to process.
+Set the scenarios, years, metrics, and entities (crop × farming type) to process.
 
 ```{r}
 # Scenario identifiers (must match the ZIP internal paths AND the metadata JSON order)
 scenarios <- c("NfN_NfN", "NfNl_NfNl", "NaC_NaC", "NfS_NfS", "BAU")
 
-# Years and metrics (metric order must match the metadata JSON: 1 protected, 2 unprotected, 3 total)
+# Years (band order in each stack)
 target_years <- c("2020", "2030", "2050", "2070")
-metrics      <- c("protected", "unprotected", "total")
+
+# Metrics (order must match the metadata JSON). These are the value columns in the tables:
+# A area (Mha); FI fertiliser intensity (0-1); FQ fertiliser quantity (kgN/ha);
+# II irrigation intensity (0-1); IQ irrigation quantity (L/m2);
+# OI other-management intensity (0-1); Y yield (t/ha).
+metrics <- c("A", "FI", "FQ", "II", "IQ", "OI", "Y")
+
+# Entities = crop x farming type
+entities <- c(
+  "conventional-wheat",        "restricted-wheat",
+  "conventional-sugar",        "restricted-sugar",
+  "conventional-starchyRoots", "restricted-starchyRoots",
+  "conventional-setaside",     "restricted-setaside",
+  "conventional-rice",         "restricted-rice",
+  "conventional-pulses",       "restricted-pulses",
+  "conventional-pasture",      "restricted-pasture",
+  "conventional-oilcropsOther","restricted-oilcropsOther",
+  "conventional-oilcropsNFix", "restricted-oilcropsNFix",
+  "conventional-maize",        "restricted-maize",
+  "conventional-fruitveg",     "restricted-fruitveg",
+  "conventional-energycrops",  "restricted-energycrops"
+)
 
 # Folder level inside each ZIP, and the variable
 level_4 <- "s1"
-var_4   <- "LandCover"
-
-# Land-use classes (entity order must match the metadata JSON)
-landcover_cols <- c(
-  "Cropland", "Pasture", "TimberForest", "CarbonForest", "UnmanagedForest",
-  "OtherNatural", "Agrivoltaics", "Photovoltaics", "Barren", "Urban"
-)
+var_4   <- "LandUse"
 
 cat("Scenarios:", paste(scenarios, collapse = ", "), "\n")
 cat("Years:", paste(target_years, collapse = ", "), "\n")
 cat("Metrics:", paste(metrics, collapse = ", "), "\n")
+cat("Entities:", length(entities), "\n")
 ```
 
 ## 6. Build the 0.5° raster template
@@ -141,15 +156,15 @@ half_res <- res(r_template) / 2
 half_res
 ```
 
-## 7. Rasterize and stack {#sec-7.-rasterize-and-stack}
+## 7. Rasterize and stack
 
-For each scenario, read the yearly tables, compute the three percentage metrics per cell, and write one stacked GeoTIFF per metric and class (bands = years).
+For each scenario, read the yearly tables, split each into entities (crop × farming type), and write one stacked GeoTIFF per metric and entity (bands = years). Zeros are kept as data; an entity absent from a scenario (e.g. restricted under BAU) is written all-NA so the cube structure stays consistent.
 
 ```{r}
 start_time <- Sys.time()
 
-ny   <- length(target_years)
-ncls <- length(landcover_cols)
+ny     <- length(target_years)
+n_cell <- ncell(r_template)
 
 for (scen in scenarios) {
 
@@ -163,97 +178,64 @@ for (scen in scenarios) {
   cat("\n=============================\n")
   cat("Scenario:", scen, "\n")
 
-  # Per-year percentage matrices (ncell x class), one list per metric
-  prot_years   <- vector("list", ny)
-  unprot_years <- vector("list", ny)
-  total_years  <- vector("list", ny)
+  # Read each year and split into entity subsets (farming type + crop)
+  year_splits <- vector("list", ny)
 
   for (y in seq_along(target_years)) {
 
     yr <- target_years[y]
     rel_path <- sprintf("%s/%s/%s/%s.txt.gz", scen, level_4, yr, var_4)
 
-    # Extract and read the gzipped table
-    tmp_dir <- local_tmp
-    unzip(scen_zip, files = rel_path, exdir = tmp_dir)
+    # Extract flat (strip the archive's folders), then read
+    tmp_dir <- file.path(local_tmp, scen, level_4, yr)
+    dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
+    unzip(scen_zip, files = rel_path, exdir = tmp_dir, junkpaths = TRUE)
 
-    txt_gz  <- file.path(tmp_dir, rel_path)
+    txt_gz <- file.path(tmp_dir, basename(rel_path))
     con <- gzfile(txt_gz, "rt")
     dat <- read.table(con, header = TRUE, check.names = FALSE)
-    # View(dat)
     close(con)
     unlink(txt_gz)
 
     cat("  year", yr, "\n")
 
-    stopifnot(all(c("Lon", "Lat", "Protection") %in% names(dat)))
-    stopifnot(all(landcover_cols %in% names(dat)))
+    stopifnot(all(c("Lon", "Lat", "Type", "Crop") %in% names(dat)))
+    stopifnot(all(metrics %in% names(dat)))
 
     # Cell index from the cell centre; drop rows outside the grid
     dat$cell <- cellFromXY(r_template, cbind(dat$Lon + half_res[1],
                                              dat$Lat + half_res[2]))
     dat <- dat[!is.na(dat$cell), ]
 
-    # Align protected and unprotected areas per cell
-    # (one protected and one unprotected row per cell)
-    cells_all <- sort(unique(dat$cell))
-    P <- matrix(0, length(cells_all), ncls, dimnames = list(NULL, landcover_cols))
-    U <- P
+    # Entity key = farming type + crop, e.g. "conventional_wheat".
+    # Keep only the columns we need, then split by entity.
+    dat$entity <- paste(dat$Type, dat$Crop, sep = "-")
+    dat <- dat[, c("entity", "cell", metrics)]
+    year_splits[[y]] <- split(dat, dat$entity)
 
-    pr <- dat[dat$Protection == "protected", ]
-    un <- dat[dat$Protection == "unprotected", ]
-    P[match(pr$cell, cells_all), ] <- as.matrix(pr[, landcover_cols])
-    U[match(un$cell, cells_all), ] <- as.matrix(un[, landcover_cols])
-    Tot <- P + U
-
-    # Denominator: combined land area per cell (all classes, protected + unprotected).
-    # To divide each metric by its own protection subset instead, change this line.
-    denom <- rowSums(Tot)
-    denom[denom == 0] <- NA
-
-    P   <- 100 * P   / denom
-    U   <- 100 * U   / denom
-    Tot <- 100 * Tot / denom
-
-    # Place the per-cell values into full-grid matrices (ncell x class)
-    full_P <- matrix(NA_real_, ncell(r_template), ncls)
-    full_U <- matrix(NA_real_, ncell(r_template), ncls)
-    full_T <- matrix(NA_real_, ncell(r_template), ncls)
-    full_P[cells_all, ] <- P
-    full_U[cells_all, ] <- U
-    full_T[cells_all, ] <- Tot
-
-    prot_years[[y]]   <- full_P
-    unprot_years[[y]] <- full_U
-    total_years[[y]]  <- full_T
-
-    rm(dat, pr, un, P, U, Tot, full_P, full_U, full_T)
+    rm(dat)
     gc()
   }
 
-  # Write one stacked GeoTIFF per metric and class (bands = years)
-  for (metric in metrics) {
+  # Write one stacked GeoTIFF per metric and entity (bands = years)
+  for (m in metrics) {
 
-    metric_years <- switch(metric,
-      protected   = prot_years,
-      unprotected = unprot_years,
-      total       = total_years
-    )
+    for (ent in entities) {
 
-    for (k in seq_along(landcover_cols)) {
-
-      cls <- landcover_cols[k]
-
-      # Assemble the year bands for this class
-      vmat <- matrix(NA_real_, ncell(r_template), ny)
-      for (y in seq_along(target_years)) vmat[, y] <- metric_years[[y]][, k]
+      vmat <- matrix(NA_real_, n_cell, ny)
+      for (y in seq_along(target_years)) {
+        sub <- year_splits[[y]][[ent]]   # NULL if this entity is absent that year
+        if (!is.null(sub) && nrow(sub) > 0) vmat[sub$cell, y] <- sub[[m]]
+      }
+      # Note: zeros are real data and stay 0; only cells with no row remain NA.
 
       r_stack <- rast(r_template, nlyrs = ny)
       values(r_stack) <- vmat
       names(r_stack)  <- target_years
 
-      out_file <- file.path(out_dir, metric, scen, level_4,
-                            sprintf("PLUM_%s_%s_%s.tif", metric, scen, cls))
+      out_file <- file.path(out_dir, m, scen, level_4,
+                            sprintf("LandUse_%s_%s_%s.tif", m, scen, ent))
+      
       dir.create(dirname(out_file), recursive = TRUE, showWarnings = FALSE)
 
       writeRaster(
@@ -263,10 +245,10 @@ for (scen in scenarios) {
         gdal = c("COMPRESS=DEFLATE")
       )
     }
-    cat("  wrote metric:", metric, "\n")
+    cat("  wrote metric:", m, "\n")
   }
 
-  rm(prot_years, unprot_years, total_years)
+  rm(year_splits)
   gc()
 }
 
@@ -279,23 +261,23 @@ cat("\nRasterization completed in ",
 
 ### 8.1 Check paths and available rasters
 
-Define the metadata JSON and the target NetCDF file, and confirm the stacked GeoTIFFs from [Section 7](#sec-7.-rasterize-and-stack) are present in the expected folders. This check catches missing inputs before the cube is built.
+Define the metadata JSON and the target NetCDF file, and confirm the stacked GeoTIFFs from Section 7 are present in the expected folders. This check catches missing inputs before the cube is built.
 
-```{r, eval=FALSE}
+```{r}
 # Define date and check id
-id <- 102
-creation_date <- "20260626"
+id            <- 101
+creation_date <- "20260629"
 cat("Created date:", format(as.Date(creation_date, format = "%Y%m%d")), "\n")
 cat("ID:", id, "\n")
 
 # Define paths
-root <- paste0("../ebvportal/upload/", id)
+root <- paste0("I:/ebvportal/upload/", id)
 js   <- file.path(root, "metadata.json")
 
 # Note:
 # Please follow the naming convention
 # "<first_author>_<ebv_class>_id<ID>_<YYYYMMDD>.nc"
-nc <- paste0("../ebv_portal/", id, "/alexander_ecostr_id", id, "_", creation_date, ".nc")
+nc <- paste0("S:/ebv_portal/", id, "/alexander_ecostr_id", id, "_", creation_date, ".nc")
 
 cat("EBV Cube NetCDF file name:", basename(nc), "\n")
 cat("Rasterized root folder:", out_dir, "\n")
@@ -308,15 +290,10 @@ cat("Total stacked GeoTIFF files found:", length(tif_files), "\n")
 
 ### 8.2 Define EBV Cube structure
 
-Define the cube's spatial, temporal, and thematic components: entities, extent and resolution, CRS, time steps, fill value, and data precision. Entities here are the land-use classes, and the values are continuous percentages (0–100).
+Define the cube's spatial, temporal, and thematic components: entities, extent and resolution, CRS, time steps, fill value, and data precision. Entities here are crop × farming type, and the values are continuous management variables.
 
-```{r, }
-
-# Define entities
-entities <- landcover_cols
-cat("Entity variable\n")
-cat("=======================\n")
-cat("Entity names: ", paste(entities, collapse = ", "), "\n")
+```{r, eval}
+cat("Entity names:", paste(entities, collapse = ", "), "\n")
 cat("Entities number:", length(entities), "\n")
 
 # Spatio-temporal setting
@@ -336,9 +313,9 @@ prec      <- "float"
 
 ### 8.3 Create empty NetCDF file
 
-Create the empty NetCDF file from the properties defined above. It holds the cube structure but no raster data yet — that comes in [Section 9](#sec-9.-populate-the-ebv-cube).
+Create the empty NetCDF file from the properties defined above. It holds the cube structure but no raster data yet — that comes in Section 9.
 
-```{r, eval=FALSE}
+```{r}
 cat("Creating EBV Cube NetCDF\n")
 cat("=======================\n")
 
@@ -360,9 +337,9 @@ ebv_create(
 cat("EBV cube created at:", nc, "\n")
 ```
 
-## 9. Populate the EBV Cube {#sec-9.-populate-the-ebv-cube}
+## 9. Populate the EBV Cube
 
-Insert the stacked rasters into the cube one by one. For each scenario, metric, and class, the workflow reads the stacked GeoTIFF and inserts each year band at its correct scenario / metric / time step / entity position.
+Insert the stacked rasters into the cube one by one. For each scenario, metric, and entity, the workflow reads the stacked GeoTIFF and inserts each year band at its correct scenario / metric / time step / entity position.
 
 ```{r}
 # Get the properties and entities
@@ -382,13 +359,14 @@ for (s_no in seq_along(scenarios)) {
 
     for (e_no in seq_len(n_entities)) {
 
-      cls <- entities[e_no]
+      ent <- entities[e_no]
 
       in_file <- file.path(out_dir, metric, sc, level_4,
-                           sprintf("PLUM_%s_%s_%s.tif", metric, sc, cls))
+                           sprintf("LandUse_%s_%s_%s.tif", metric, sc, ent))
 
       if (!file.exists(in_file)) {
-        stop("Missing entity file: ", in_file)
+        warning("Missing file, skipped: ", in_file)
+        next
       }
 
       # One band per year in the stacked file
@@ -409,8 +387,8 @@ for (s_no in seq_along(scenarios)) {
       }
 
       gc(verbose = FALSE)
-      cat("  ✔ inserted", metric, "|", sc, "|", cls, "\n")
     }
+    cat("  ✔ inserted", metric, "|", sc, "\n")
   }
 }
 
@@ -419,7 +397,7 @@ end.time <- Sys.time()
 time.taken <- end.time - start.time
 time.taken
 
-cat("\n DONE. All layers inserted into:\n", nc, "\n")
+cat("\n🎉 DONE. All layers inserted into:\n", nc, "\n")
 ```
 
 ## 10. Validation and visualization
@@ -427,7 +405,7 @@ cat("\n DONE. All layers inserted into:\n", nc, "\n")
 A quick check that the cube is readable and that the metrics, entities, and time steps line up.
 
 ```{r}
-ebv_analyse(nc, entity = 'UnmanagedForest', timestep = 1, scenario = 1, metric = 1)
+ebv_analyse(nc, entity = 1, timestep = 1, scenario = 1, metric = 1)
 
 props <- ebv_properties(nc, scenario = 1, metric = 1)
 props@ebv_cube$type
@@ -437,15 +415,15 @@ props@general$entity_names
 datacubes <- ebv_datacubepaths(nc, verbose = FALSE)
 
 # Simple plot
-ebv_map(filepath = nc, datacubepath = datacubes[1, 1], entity = 'UnmanagedForest',
-        timestep = 2, verbose = FALSE)
+ebv_map(filepath = nc, datacubepath = datacubes[1, 1], entity = 1,
+        timestep = 1, verbose = FALSE)
 ```
 
 ## 11. Clean up temporary extraction files
 
 With everything inserted, the temporary extraction folder can be removed to free disk space.
 
-```{r}
+```{r, eval=FALSE}
 cat("Removing temporary extraction folder:", local_tmp, "\n")
 unlink(local_tmp, recursive = TRUE)
 

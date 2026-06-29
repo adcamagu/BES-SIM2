@@ -1,13 +1,13 @@
 ---
 title: "GLOBIO Land-Use - Reclassification and EBV Cube generation"
-author: "Emmanuel Oceguera-Conchas, Andres Marmol Guijarro"
+author: "Emmanuel Oceguera-Conchas, Andres Marmol Guijarro, Magali Weissgerber"
 date: 23-02-2026
 output: html_document
 ---
 
 ## 1. Introduction
 
-This workflow processes high-resolution GLOBIO land-use data and converts it into an EBV Cube NetCDF file.
+This workflow processes high-resolution GLOBIO land-use data and converts it into an EBV Cube NetCDF file (dataset ID 98).
 
 The GLOBIO data come at a resolution of 0.002777° (approx. 300 m at the equator) and contain numerous detailed land-use categories. For compatibility with the EBV Cube structure, these are first grouped into a smaller set of harmonized broad land-use classes.
 
@@ -82,16 +82,16 @@ Reclassification and binarization can write a lot of temporary data to disk, so 
 
 ```{r}
 
-local_temp <- "D:/temp" # Define local disk
-dir.create(local_temp, showWarnings = FALSE, recursive = TRUE)
+local_tmp <- "D:/temp" # Define local disk
+dir.create(local_tmp, showWarnings = FALSE, recursive = TRUE)
 
 terraOptions(
   todisk  = TRUE,
   memfrac = 0.3,
-  tempdir = local_temp 
+  tempdir = local_tmp 
 )
 
-cat("Local temporary folder: ", local_temp)
+cat("Local temporary folder: ", local_tmp)
 ```
 
 ## 4. Define input and output paths
@@ -197,7 +197,7 @@ for (z in zip_files) {
   z_base <- tools::file_path_sans_ext(basename(z))
   
   z_tmp  <- file.path(
-    local_temp, 
+    local_tmp, 
     paste0(z_base, "_", Sys.getpid())
     )
   
@@ -292,7 +292,7 @@ dir.create(hist_out_dir, showWarnings = FALSE, recursive = TRUE)
 z_base <- tools::file_path_sans_ext(basename(hist_zip))
 
 z_tmp  <- file.path(
-  local_temp, 
+  local_tmp, 
   paste0(z_base, "_", Sys.getpid())
   )
 
@@ -432,7 +432,7 @@ future_lapply(seq_len(nrow(jobs)), function(k) {
   terraOptions(
     todisk  = TRUE,
     memfrac = 0.3,
-    tempdir = local_temp 
+    tempdir = local_tmp 
     )
   
   sc <- jobs$sc[k]

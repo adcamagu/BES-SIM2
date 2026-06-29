@@ -1,13 +1,13 @@
 ---
 title: "GLOBIO Land-Use - Aggregation to 0.5° and EBV Cube generation"
-author: "Emmanuel Oceguera-Conchas, Andres Marmol Guijarro"
+author: "Emmanuel Oceguera-Conchas, Andres Marmol Guijarro, Magali Weissgerber"
 date: 11-02-2026
 output: html_document
 ---
 
 ## 1. Introduction
 
-This workflow processes GLOBIO land-use data and converts it into an EBV Cube NetCDF file.
+This workflow processes GLOBIO land-use data and converts it into an EBV Cube NetCDF file (dataset ID 103).
 
 Unlike the high-resolution binary workflow, it aggregates the preprocessed layers from 0.002777° (approx. 300 m at the equator) to a coarser resolution of 0.5°, storing each class's proportional cover per grid cell.
 
@@ -77,16 +77,16 @@ Aggregation can write a lot of temporary data to disk, so point `terra` at a dri
 
 ```{r}
 
-local_temp <- "D:/temp" # Define local disk
-dir.create(local_temp, showWarnings = FALSE, recursive = TRUE)
+local_tmp <- "D:/temp" # Define local disk
+dir.create(local_tmp, showWarnings = FALSE, recursive = TRUE)
 
 terraOptions(
   todisk  = TRUE,
   memfrac = 0.3,
-  tempdir = local_temp 
+  tempdir = local_tmp 
 )
 
-cat("Local temporary folder: ", local_temp)
+cat("Local temporary folder: ", local_tmp)
 ```
 
 ## 4. Define input and output paths

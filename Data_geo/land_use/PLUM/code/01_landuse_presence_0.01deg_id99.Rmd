@@ -1,13 +1,13 @@
 ---
 title: "PLUM Land-Use – Binarization and EBV Cube Generation"
-author: "Emmanuel Oceguera-Conchas, Andres Marmol-Guijarro"
-date: 03-02-2026
+author: "Emmanuel Oceguera-Conchas, Andres Marmol-Guijarro, Magali Weissgerber"
+date: 2026-02-03
 output: html_document
 ---
 
 ## 1. Introduction
 
-This workflow processes high-resolution PLUM land-use maps and converts them into an EBV Cube NetCDF file.
+This workflow processes high-resolution PLUM land-use maps and converts them into an EBV Cube NetCDF file (dataset ID 99).
 
 The PLUM maps come at a resolution of 0.01° (approx. 1 km at the equator), with one band per year and pixel values coded as land-use classes. Each class is converted into a binary presence/absence layer and stored as an EBV entity, while ocean, water, and NoData are excluded from the entity list and masked to `NA` before binarization.
 
@@ -78,16 +78,16 @@ Binarization can write a lot of temporary data to disk, so point `terra` at a dr
 
 ```{r}
 
-local_temp <- "D:/temp" # Define local disk
-dir.create(local_temp, showWarnings = FALSE, recursive = TRUE)
+local_tmp <- "D:/temp" # Define local disk
+dir.create(local_tmp, showWarnings = FALSE, recursive = TRUE)
 
 terraOptions(
   todisk  = TRUE,
   memfrac = 0.3,
-  tempdir = local_temp 
+  tempdir = local_tmp 
 )
 
-cat("Local temporary folder: ", local_temp)
+cat("Local temporary folder: ", local_tmp)
 
 ```
 
