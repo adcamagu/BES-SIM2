@@ -1,83 +1,55 @@
 ---
 title: "LUH3 v1.1 — GeoTIFF Extraction"
 subtitle: "Preprocessing step for all MAgPIE EBVcube workflows"
-author: "Andres Marmol Guijarro, Emmanuel Oceguera-Conchas"
-date: "2026-03-19"
+author: "Emmanuel Oceguera-Conchas, Andres Marmol-Guijarro, Magali Weissgerber"
+date: 2026-03-19
 output: html_document
-editor_options:
-  markdown:
-    wrap: 72
 ---
 
 ## 1. Introduction
 
-This script is the shared preprocessing step for all MAgPIE EBVcube
-workflows. It extracts selected time slices from four LUH3 v1.1 NetCDF
-files prepared for CMIP7 and writes one GeoTIFF per variable × scenario
-× year into a single flat output folder. The resulting GeoTIFFs are then
-used as inputs by the individual EBVcube creation scripts (scripts
-02–05).
+This script is the shared preprocessing step for all MAgPIE EBVcube workflows. It extracts selected time slices from four LUH3 v1.1 NetCDF files prepared for CMIP7 and writes one GeoTIFF per variable × scenario × year into a single flat output folder. The resulting GeoTIFFs are then used as inputs by the individual EBVcube creation scripts (scripts 02–05).
 
-The source data covers two climate scenarios, each driven by a different
-Integrated Assessment Model (IAM):
+The source data covers two climate scenarios, each driven by a different Integrated Assessment Model (IAM), and each provided in two netCDF files: a *state* file (105 variables: land cover fractions and secondary vegetation properties) and a *mangament* file (34 variables: fertilization, irrigation, biofuels, forest haverst, proection, and added tree cover.)
+
+The workflow comprises two cores stepts:
+
+-   *Selection:* Each variable is read from its NetCDF file, the four target year layers are selected, and fill values are masked to `NA`.
+-   *Extraction:* One LZW-compressed GeoTIFF is written per variable, scenario, and year, named `{file_type}_{scenario}_{variable}_{year}.tif` (e.g. `states_vl_c3ann_2022.tif`) so all four can be parsed back from the filename without subfolders.
+
+In the notebook, these steps spann three sections: preparing the working environment (loading `terra` and setting paths), defining the variable lists, and extracting and writing the GeoTIFFs.
+
+> **Note:** Plantation variables (`pltns`, `prtct_pltns`, `pltns_bfuel`, `pltns_wdprd`), biofuel variables (`cpbf1_*`, `cpbf2_*`), and protection variables (`prtct_*`) are zero in LUH3 v1.1 and will produce all-zero GeoTIFFs. They are extracted for structural completeness and will be updated when future versions of the dataset provide non-zero values.
+
+### 1.1 Scenarios and time steps
+
+The workflow processes two scenarios across four years each (2022, 2030, 2050, 2070), extracted from files that run annually from 2022 to 2100.
 
 | Scenario | Code | IAM | Description |
-|------------------|------------------|------------------|---------------|
+|------------------|------------------|------------------|------------------|
 | Low-MAgPIE | `vl` | REMIND-MAgPIE | Very low emissions, land-use change driven by REMIND-MAgPIE |
 | H-GCAM | `h` | GCAM | High emissions scenario, land-use change driven by GCAM |
 
-Each scenario is provided in two NetCDF files:
-
--   *multiple-states*: land cover fractions and secondary vegetation
-    properties (15 variables)
--   *multiple-management*: fertilization, irrigation, biofuels, forest
-    harvest, protection, and added tree cover (34 variables)
-
-Output GeoTIFFs follow the naming convention
-`{file_type}_{scenario}_{variable}_{year}.tif`, e.g.
-`states_vl_c3ann_2022.tif` or `management_h_rndwd_2050.tif`. This
-encoding allows scenario, file type, variable, and year to be parsed
-back from the filename without requiring subfolders.
-
-> **Note:** Plantation variables (`pltns`, `prtct_pltns`, `pltns_bfuel`,
-> `pltns_wdprd`), biofuel variables (`cpbf1_*`, `cpbf2_*`), and
-> protection variables (`prtct_*`) are set to zero in LUH3 v1.1 and will
-> produce all-zero GeoTIFFs. These are extracted for structural
-> completeness and will be updated when future versions of the dataset
-> provide non-zero values.
-
-### 1.1 Overview of the workflow
-
-This script follows three core processing stages:
-
-1.  *Prepare the working environment.* Load the required R packages,
-    define paths, and set the target years and variable lists.
-
-2.  *Define the extraction function.* A reusable function reads one
-    variable from a NetCDF file, selects the target time layers, masks
-    fill values, and writes one LZW-compressed GeoTIFF per year.
-
-3.  *Extract all variables.* Loop over both scenarios × both file types
-    × all variables, calling the extraction function for each
-    combination.
-
 ### 1.2 Before you start
 
-To ensure the workflow runs smoothly, the following conditions should be
-met:
+Make sure the following are in place:
 
--   The four raw LUH3 v1.1 NetCDF files are available in the `raw/`
-    folder (see paths in section 4).
--   Sufficient disk space is available for the output GeoTIFFs. With two
-    scenarios × 49 variables × 4 years, approximately 400 files will be
-    created.
--   The `terra` package is installed and working correctly.
--   This script should be run before any of the EBVcube creation scripts
-    (02–05), as they all depend on the GeoTIFFs produced here.
+-   The four raw LUH3 v1.1 NetCDF files, available in the `raw/` folder (see paths in [Section 4](#sec-4.-define-input-and-output-paths))
+-   Enough disk space for the output GeoTIFFs (two scenarios × 49 variables × four years ≈ 400 files)
+-   A working `terra` installation
+-   This script is run before any of the EBVcube creation scripts (02–05), which all depend on the GeoTIFFs produced here
 
-------------------------------------------------------------------------
+```{r}
+knitr::opts_chunk$set(cache = TRUE)
+```
 
 ## 2. Load libraries
+
+Here we load the only package used in this workflow: `terra`, for reading the LUH3 NetCDF files and writing the extracted GeoTIFFs.
+
+### 2.1 Clean environment and load libraries
+
+If required, install the missing package before running the workflow.
 
 ```{r}
 # Clean environment
@@ -89,40 +61,31 @@ gc()
 library(terra)
 ```
 
-------------------------------------------------------------------------
-
 ## 3. Configure temporary raster storage
 
-Raster operations can create large temporary files. It is recommended to
-define a dedicated temporary folder on a drive with sufficient free
-space. Adjust the path below to a local drive if needed.
+Extracting and writing the GeoTIFFs can create large temporary files, so point `terra` at a drive with enough free space.
 
 ```{r}
-local_temp <- "../raw/temp_terra"
-dir.create(local_temp, showWarnings = FALSE, recursive = TRUE)
+local_tmp <- "D:/temp" # Define local disk
+dir.create(local_tmp, showWarnings = FALSE, recursive = TRUE)
 
 terraOptions(
   todisk  = TRUE,
   memfrac = 0.3,
-  tempdir = local_temp
+  tempdir = local_tmp 
 )
 
-cat("Temporary folder:", local_temp, "\n")
+cat("Local temporary folder: ", local_tmp)
 ```
 
-------------------------------------------------------------------------
+## 4. Define input and output paths {#sec-4.-define-input-and-output-paths}
 
-## 4. Define paths
-
-Here we define the location of the raw LUH3 v1.1 NetCDF files and the
-output folder where the extracted GeoTIFFs will be written.
-
-All paths are defined relative to the location of this script, so the
-workflow is portable and does not depend on absolute paths.
+Input: the four raw LUH3 v1.1 NetCDF files.\
+Output: the flat folder of extracted GeoTIFFs shared by scripts 02–05. Paths are relative to this script's location..
 
 ```{r}
-# Set working directory to the location of this script (RStudio only)
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+# Set working directory to the location of this script (RStudio only) - no needed
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 # Raw NetCDF input files
 raw_dir <- "../raw"
@@ -143,6 +106,12 @@ states_nc_h      <- file.path(raw_dir,
 management_nc_h  <- file.path(raw_dir,
   "multiple-management_input4MIPs_landState_ScenarioMIP_UofMD-landState-h-3-1_gn_2022-2100.nc")
 
+# Lookup of NetCDF path per scenario and file type (used in Section 7)
+nc_paths <- list(
+  vl = c(states = states_nc_vl, management = management_nc_vl),
+  h  = c(states = states_nc_h,  management = management_nc_h)
+)
+
 # Verify input files exist
 for (f in c(states_nc_vl, management_nc_vl, states_nc_h, management_nc_h)) {
   cat(basename(f), "— exists:", file.exists(f), "\n")
@@ -150,15 +119,14 @@ for (f in c(states_nc_vl, management_nc_vl, states_nc_h, management_nc_h)) {
 cat("Output folder:", out_dir, "\n")
 ```
 
-------------------------------------------------------------------------
+## 5. Define the main workflow settings
 
-## 5. Define workflow settings
-
-The LUH3 v1.1 files run annually from 2022 to 2100 (79 time steps). We
-extract four specific years: 2022 (reference), 2030, 2050, and 2070. The
-time index for a given year is computed as `year - 2022 + 1`.
+Set the scenarios, file types, and target years. The files run annually from 2022 to 2100, so the layer index for a given year is `year - 2022 + 1`.
 
 ```{r}
+scenarios  <- c("vl", "h")
+file_types <- c("states", "management")
+
 # Target years and their layer indices in the NetCDF files
 target_years <- c(2022, 2030, 2050, 2070)
 year_indices <- target_years - 2022 + 1
@@ -167,14 +135,11 @@ data.frame(Year = target_years, `Layer index` = year_indices,
            check.names = FALSE)
 ```
 
-------------------------------------------------------------------------
-
 ## 6. Define variable lists
 
 ### 6.1 States variables
 
-The *multiple-states* file contains 15 variables describing land cover
-fractions and secondary vegetation properties.
+The *states* file contains 15 variables describing land-cover fractions and secondary-vegetation properties.
 
 ```{r}
 states_vars <- c(
@@ -211,8 +176,7 @@ knitr::kable(states_meta, align = "llll")
 
 ### 6.2 Management variables
 
-The *multiple-management* file contains 34 variables describing land
-management intensity across crop, forest, and protection domains.
+The *management* file contains 34 variables describing land-management intensity across crop, forest, and protection domains.
 
 ```{r}
 management_vars <- c(
@@ -238,119 +202,53 @@ management_vars <- c(
 cat("Management variables:", length(management_vars), "\n")
 ```
 
-------------------------------------------------------------------------
+## 7. Extract all variables {#sec-7.-extract-all-variables}
 
-## 7. Define the extraction function
-
-The function reads one variable from a NetCDF file, selects the target
-time layers by index, masks fill values (any value ≥ 1×10¹⁹ is set to
-`NA`), assigns WGS84 if the CRS is missing, and writes one
-LZW-compressed GeoTIFF per target year.
-
-The `scenario` and `file_type` arguments are embedded in the output
-filename so that both can be parsed back from the filename alone.
+For each scenario, file type, and variable, read the variable, select the four target year layers, mask fill values (any value ≥ 1×10¹⁹ → `NA`), assign WGS84 if the CRS is missing, and write one LZW-compressed GeoTIFF per year.
 
 ```{r}
-extract_variable <- function(nc_path, varname, years, indices, outdir,
-                              scenario, file_type) {
-
-  cat("  Processing:", varname, "\n")
-
-  # Read the variable — skip gracefully if not found
-  r <- tryCatch(
-    rast(nc_path, subds = varname),
-    error = function(e) {
-      cat("  Skipping", varname, "— could not read:", e$message, "\n")
-      return(NULL)
-    }
-  )
-  if (is.null(r)) return(invisible(NULL))
-
-  # Select target time layers
-  nlyr_available <- nlyr(r)
-  valid_idx      <- indices[indices <= nlyr_available]
-  valid_yrs      <- years[indices <= nlyr_available]
-
-  if (length(valid_idx) == 0) {
-    cat("  Skipping", varname, "— no valid time indices\n")
-    return(invisible(NULL))
-  }
-
-  r_sub <- r[[valid_idx]]
-
-  # Assign WGS84 if CRS is missing
-  if (is.na(crs(r_sub))) crs(r_sub) <- "EPSG:4326"
-
-  # Mask fill values
-  r_sub[r_sub >= 1e19] <- NA
-
-  # Write one GeoTIFF per year
-  written <- character()
-  for (i in seq_along(valid_yrs)) {
-    fname <- file.path(outdir,
-                       paste0(file_type, "_", scenario, "_",
-                              varname, "_", valid_yrs[i], ".tif"))
-    writeRaster(r_sub[[i]], fname, overwrite = TRUE,
-                gdal = c("COMPRESS=LZW", "TILED=YES"))
-    written <- c(written, basename(fname))
-  }
-
-  return(written)
-}
-```
-
-------------------------------------------------------------------------
-
-## 8. Extract all variables
-
-The extraction loops over both scenarios × both file types × all
-variables. Progress is printed to the console for each combination.
-
-```{r}
-# Define scenario structure
-scenarios <- list(
-  vl = list(label = "Low-MAgPIE (VL)", states = states_nc_vl,
-             management = management_nc_vl),
-  h  = list(label = "H-GCAM (H)",      states = states_nc_h,
-             management = management_nc_h)
-)
-
-# Run extraction
-all_log <- list()
 start_time <- Sys.time()
 
-for (sc in names(scenarios)) {
+for (sc in scenarios) {
 
-  cat("\n==============================\n")
-  cat("Scenario:", scenarios[[sc]]$label, "\n")
-  cat("==============================\n")
+  for (ft in file_types) {
 
-  # States variables
-  cat("\n--- States ---\n")
-  for (v in states_vars) {
-    all_log[[paste(sc, "states", v, sep = "_")]] <- extract_variable(
-      nc_path   = scenarios[[sc]]$states,
-      varname   = v,
-      years     = target_years,
-      indices   = year_indices,
-      outdir    = out_dir,
-      scenario  = sc,
-      file_type = "states"
-    )
-  }
+    nc_path <- nc_paths[[sc]][[ft]]
+    vars    <- if (ft == "states") states_vars else management_vars
 
-  # Management variables
-  cat("\n--- Management ---\n")
-  for (v in management_vars) {
-    all_log[[paste(sc, "management", v, sep = "_")]] <- extract_variable(
-      nc_path   = scenarios[[sc]]$management,
-      varname   = v,
-      years     = target_years,
-      indices   = year_indices,
-      outdir    = out_dir,
-      scenario  = sc,
-      file_type = "management"
-    )
+    cat("\n==============================\n")
+    cat("Scenario:", sc, "| File type:", ft, "\n")
+    cat("==============================\n")
+
+    for (v in vars) {
+
+      cat("  Processing:", v, "\n")
+
+      # Read the variable from the NetCDF
+      r <- rast(nc_path, subds = v)
+
+      # Select the target year layers that exist in the file
+      valid     <- year_indices[year_indices <= nlyr(r)]
+      valid_yrs <- target_years[year_indices <= nlyr(r)]
+      if (length(valid) == 0) {
+        warning("No valid time indices for ", v); next
+      }
+      r_sub <- r[[valid]]
+
+      # Assign WGS84 if the CRS is missing
+      if (!nzchar(crs(r_sub))) crs(r_sub) <- "EPSG:4326"
+
+      # Mask fill values
+      r_sub[r_sub >= 1e19] <- NA
+
+      # Write one GeoTIFF per year
+      for (i in seq_along(valid_yrs)) {
+        out_file <- file.path(out_dir,
+                              sprintf("%s_%s_%s_%s.tif", ft, sc, v, valid_yrs[i]))
+        writeRaster(r_sub[[i]], out_file, overwrite = TRUE,
+                    gdal = c("COMPRESS=LZW", "TILED=YES"))
+      }
+    }
   }
 }
 
@@ -359,19 +257,14 @@ cat("\nExtraction complete. Time elapsed:", round(elapsed, 1),
     units(elapsed), "\n")
 ```
 
-------------------------------------------------------------------------
+## 8. Summary and verification
 
-## 9. Summary and verification
-
-After extraction, we count the output GeoTIFFs and verify the expected
-number of files per scenario and file type.
+Count the output GeoTIFFs and check the totals per scenario and file type against the expected numbers.
 
 ```{r}
 tif_files <- list.files(out_dir, pattern = "\\.tif$", full.names = FALSE)
 
-# Parse filename components
-library(stringr)
-
+# Parse filename components: {file_type}_{scenario}_{variable}_{year}.tif
 parsed <- data.frame(
   filename  = tif_files,
   file_type = str_extract(tif_files, "^(states|management)"),
@@ -393,7 +286,4 @@ print(summary_tbl)
 cat("\nThese GeoTIFFs are the inputs for scripts 02-05.\n")
 ```
 
-------------------------------------------------------------------------
-
-*Dataset: LUH3 V1.1 — UofMD · Hurtt et al. 2020 · CMIP7 ScenarioMIP ·
-Low-MAgPIE (VL) and H-GCAM (H) · 2022–2100*
+*Dataset: LUH3 V1.1 — UofMD · Hurtt et al. 2020 · CMIP7 ScenarioMIP · Low-MAgPIE (VL) and H-GCAM (H) · 2022–2100*

@@ -41,7 +41,6 @@ Make sure the following are in place:
 -   A working `ebvcube` install, plus `terra`, `stringr`, `dplyr`, and `future.apply`
 
 ```{r}
-# note: Set cache = FALSE when re-running after changes to input data or paths
 knitr::opts_chunk$set(cache = TRUE)
 ```
 

@@ -38,7 +38,7 @@ Make sure the following are in place:
 -   The PLUM scenario ZIP archives (tabular `.txt.gz` files), in the expected folder structure `SCENARIO/s1/YEAR/LandCover.txt.gz`
 -   The dataset's `metadata.json` file (Obtain from the [EBV Data Portal](https://portal.geobon.org/datasets))
 -   Enough temporary disk space for raster processing
--   A working `ebvcube` install, plus `terra`
+-   The `ebvcube` and `terra` packages are installed
 
 ```{r}
 knitr::opts_chunk$set(cache = TRUE)
@@ -281,7 +281,7 @@ cat("\nRasterization completed in ",
 
 Define the metadata JSON and the target NetCDF file, and confirm the stacked GeoTIFFs from [Section 7](#sec-7.-rasterize-and-stack) are present in the expected folders. This check catches missing inputs before the cube is built.
 
-```{r, eval=FALSE}
+```{r}
 # Define date and check id
 id <- 102
 creation_date <- "20260626"

@@ -1,0 +1,267 @@
+---
+title: "ScenMIP7-LUH3 v1.1 Forestry Management — EBVcube creation"
+subtitle: "id109 — VL and H scenarios"
+author: "Emmanuel Oceguera-Conchas, Andres Marmol-Guijarro, Magali Weissgerber"
+date: 2026-03-25
+---
+
+## 1. Introduction
+
+This workflow processes the LUH3 v1.1 forestry management dataset, holding both climate scenarios VL (Very low emissions) and H (High emissions) and converts it into an EBV Cube NetCDF file (dataset ID 109)
+
+The forestry data describe how harvested wood biomass carbon is allocated across forest use types, extracted in script 01. The cube holds a single metric (allocation of harvested wood biomass carbon, fraction 0–1) across 5 entities (one per wood-harvest allocation type), four time steps (2022, 2030, 2050, 2070), and two scenarios; VL and H.
+
+The workflow comprises two core steps:
+
+-   *Cube creation:* An empty NetCDF file is built from the JSON metadata, establishing the spatial extent, CRS, entities, time steps, and scenarios.
+-   *Population:* Each entity's GeoTIFF is inserted at its scenario / metric / time step / entity position, for both scenarios.
+
+In the notebook, these steps span three sections: preparing the working environment (loading `ebvcube` and `terra`, setting paths and parameters), defining the spatial template, and creating and populating the cube.
+
+> **Note:** Plantation variables (`pltns_bfuel`, `pltns_wdprd`) are included as entities but are spatially empty in LUH3 v1.1. The variable `addtc` (added tree cover, afforestation) is excluded from this cube because it uses a different unit (fraction of grid cell) and is zero in LUH3 v1.1 for both scenarios.
+
+### 1.1 Scenarios and time steps
+
+The cube holds two scenarios across four years each.
+
+| Scenario | Code | IAM | Description | Available Years |
+|-------------|-------------|----------------|----------------------|---------------------|
+| Low-MAgPIE | `vl` | REMIND-MAgPIE | Very low emissions, land-use change from REMIND-MAgPIE | 2022, 2030, 2050, 2070 |
+| H-GCAM | `h` | GCAM | High emissions, land-use change from GCAM | 2022, 2030, 2050, 2070 |
+
+### 1.2 Before you start
+
+Make sure the following are in place:
+
+-   Script 01 has been run and the GeoTIFFs are available in `raw/temp/`
+-   The dataset's `metadata.json` file (Obtain from the [EBV Data Portal](https://portal.geobon.org/datasets))
+-   The `ebvcube` and `terra` packages are installed
+
+## 2. Load libraries
+
+Here we load the packages used throughout the workflow: `ebvcube` for creating and filling the cube, and `terra` for reading the reference raster.
+
+### 2.1 Clean environment and load libraries
+
+If required, install the missing packages before running the workflow.
+
+```{r}
+# Clean environment
+rm(list = ls())
+gc()
+
+# install.packages(c("ebvcube", "terra"))
+
+library(ebvcube)
+library(terra)
+```
+
+## 3. Configure temporary raster storage
+
+Reading the input rasters can create temporary files, so point `terra` at a drive with enough free space.
+
+```{r}
+local_tmp <- "D:/temp" # Define local disk
+dir.create(local_tmp, showWarnings = FALSE, recursive = TRUE)
+
+terraOptions(
+  todisk  = TRUE,
+  memfrac = 0.3,
+  tempdir = local_tmp 
+)
+
+cat("Local temporary folder: ", local_tmp)
+```
+
+## 4. Define input and output paths
+
+Input: the pre-extracted GeoTIFFs from script 01 and the JSON metadata file. Output: the EBV Cube NetCDF file. Paths are relative to this script's location.
+
+```{r}
+# Directories
+raw_dir <- "../raw"               # JSON metadata file and source NetCDF files
+pathin  <- "../raw/temp"          # Pre-extracted GeoTIFFs (output of script 01)
+cube    <- "../BES-SIM 2/ScenMIP7-LUH3/cube"              # Output folder for the EBV Cube NetCDF file
+dir.create(cube, recursive = TRUE, showWarnings = FALSE)
+
+
+cat("Input folder (GeoTIFFs):", pathin, "\n")
+cat("Output folder          :", cube,   "\n")
+```
+
+## 5. Define the main workflow settings
+
+Set the scenarios, time steps, the cube's technical parameters, and the 5 entities. The entities are the wood-harvest allocation types from the LUH3 v1.1 management dataset.
+
+```{r}
+# Scenario codes (order must match the metadata JSON: 1 VL, 2 H)
+scenarios <- c("vl", "h")
+
+# Target years (time steps)
+years <- c("2022", "2030", "2050", "2070")
+
+# EBV Cube technical parameters
+epsg <- 4326       # WGS84
+prec <- "float"    # Data precision
+fv   <- -3.4e+38   # Fill value for missing data
+
+# Entities = wood-harvest allocation types (order must match the metadata JSON).
+# pltns_bfuel and pltns_wdprd are spatially empty in LUH3 v1.1.
+entities <- c("rndwd", "fulwd", "combf", "pltns_bfuel", "pltns_wdprd")
+
+cat("Scenarios:", paste(scenarios, collapse = ", "), "\n")
+cat("Years    :", paste(years, collapse = ", "), "\n")
+cat("EPSG     :", epsg, "\n")
+cat("Fill val :", fv, "\n")
+cat("Entities (", length(entities), "):", paste(entities, collapse = ", "), "\n")
+```
+
+## 6. Define the spatial template
+
+Read one reference GeoTIFF to extract the spatial extent, resolution, and CRS used for the cube.
+
+```{r}
+template    <- rast(file.path(pathin, "management_vl_rndwd_2022.tif"))
+cube_extent <- as.vector(ext(template))
+cube_res    <- terra::res(template)
+
+cat("Extent     :", cube_extent, "\n")
+cat("Resolution :", cube_res, "\n")
+cat("CRS        :", crs(template, describe = TRUE)$code, "\n")
+```
+
+## 7. Create EBV Cube NetCDF file
+
+### 7.1 Check paths and available rasters
+
+Define the metadata JSON and the target NetCDF file, and confirm the GeoTIFFs from script 01 are present in the expected folder. This check catches missing inputs before the cube is built.
+
+```{r}
+# Define date and check id
+id            <- 109
+creation_date <- "20260325"
+cat("Created date:", format(as.Date(creation_date, format = "%Y%m%d")), "\n")
+cat("ID:", id, "\n")
+
+# Metadata JSON
+js <- file.path(raw_dir, "metadata.json")
+
+# Note:
+# Please follow the naming convention
+# "<first_author>_<ebv_class>_id<ID>_<YYYYMMDD>.nc"
+nc <- file.path(cube, paste0("Popp&Chini_ecoser_id", id, "_", creation_date, ".nc"))
+
+cat("JSON metadata exists      :", file.exists(js), "\n")
+cat("EBV Cube NetCDF file name :", basename(nc),    "\n")
+cat("Input GeoTIFF folder      :", pathin,          "\n")
+
+# List all input GeoTIFFs
+tif_files <- list.files(pathin, pattern = "\\.tif$", recursive = TRUE, full.names = TRUE)
+
+cat("Total input GeoTIFF files found:", length(tif_files), "\n")
+```
+
+### 7.2 Create empty NetCDF file
+
+Create the empty NetCDF file from the JSON metadata. It holds the cube structure (spatial extent, CRS, entities, time steps, scenarios) but no raster data yet — that comes in Section 8.
+
+```{r}
+ebv_create(
+  jsonpath   = js,
+  outputpath = nc,
+  entities   = entities,
+  epsg       = epsg,
+  extent     = cube_extent,
+  resolution = cube_res,
+  timesteps  = years,
+  fillvalue  = fv,
+  prec       = prec,
+  overwrite  = TRUE,
+  verbose    = FALSE
+)
+
+cat("=== Cube structure ===\n")
+print(ebv_datacubepaths(nc, verbose = FALSE))
+```
+
+## 8. Populate the EBV Cube
+
+Insert every entity GeoTIFF at its correct scenario / metric / time step / entity position, looping over both scenarios. Entities with no GeoTIFF in LUH3 v1.1 (the plantation variables) are skipped and remain at the cube's fill value.
+
+```{r}
+m_no     <- 1   # single metric (wood-harvest allocation fraction)
+inserted <- 0L
+
+start.time <- Sys.time()
+for (s_no in seq_along(scenarios)) {
+
+  code <- scenarios[s_no]
+
+  for (t_no in seq_along(years)) {
+
+    yr <- years[t_no]
+
+    for (e_no in seq_along(entities)) {
+
+      ent     <- entities[e_no]
+      in_file <- file.path(pathin, sprintf("management_%s_%s_%s.tif", code, ent, yr))
+
+      if (!file.exists(in_file)) {
+        warning("Missing file, skipped: ", in_file)
+        next
+      }
+
+      ebv_add_data(
+        filepath_nc = nc,
+        data        = in_file,
+        band        = 1,
+        scenario    = s_no,
+        metric      = m_no,
+        entity      = e_no,
+        timestep    = t_no,
+        ignore_RAM  = FALSE,
+        raw         = FALSE,
+        verbose     = FALSE
+      )
+      inserted <- inserted + 1L
+    }
+  }
+  cat("  ✔ inserted scenario", code, "\n")
+}
+
+end.time <- Sys.time()
+cat("\nDone. Time:", round(difftime(end.time, start.time, units = "mins"), 2), "min\n")
+```
+
+## 9. Validation and visualization
+
+A quick check that the cube is readable and that the scenarios, entities, and time steps line up.
+
+```{r}
+ebv_analyse(nc, entity = 1, timestep = 1, scenario = 1, metric = 1)
+
+props <- ebv_properties(nc, scenario = 1, metric = 1)
+props@general$entity_names
+
+# Define data cube paths
+datacubes <- ebv_datacubepaths(nc, verbose = FALSE)
+
+# Simple plot
+ebv_map(filepath = nc, datacubepath = datacubes[1, 1], entity = 1,
+        timestep = 1, verbose = FALSE)
+```
+
+## 10. Summary
+
+```{r}
+expected <- length(scenarios) * length(years) * length(entities)
+
+cat("==============================\n")
+cat("Cube     :", basename(nc), "\n")
+cat("Inserted :", inserted, "/ expected:", expected, "\n")
+cat("==============================\n")
+```
+
+------------------------------------------------------------------------
+
+*Dataset: LUH3 V1.1 — UofMD · Hurtt et al. 2020 · CMIP7 ScenarioMIP · Low-MAgPIE (VL) and H-GCAM (H) · 2022–2100*
