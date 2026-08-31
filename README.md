@@ -6,7 +6,7 @@ This repository, and its releases be will be available to download from Zenodo.
 
 ## Authors
 
-Henrique M. Pereira, Andres Marmol-Guijarro, Emmanuel Oceguera-Conchas, Magali Weissgerber and Gavin Stark.
+Andres Marmol-Guijarro, Gavin Stark, Emmanuel Oceguera-Conchas, Magali Weissgerber and Henrique M. Pereira.
 
 ## Version history
 
